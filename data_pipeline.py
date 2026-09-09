@@ -20,12 +20,13 @@ class DatasetInfo:
     """Information about a dataset"""
     shape: Tuple[int, int]
     features: List[str]
-    target: str
+    target: Optional[str]
     dtypes: Dict[str, str]
     missing_values: Dict[str, int]
     categorical_features: List[str]
     numeric_features: List[str]
     data_summary: str
+    task_type: str = "classification"
 
 
 class DataPreprocessor:
@@ -44,19 +45,10 @@ class DataPreprocessor:
         n_features: int = 10,
         test_size: float = 0.2,
         random_state: int = 42
-    ) -> Tuple[pd.DataFrame, pd.Series]:
+    ) -> pd.DataFrame:
         """
         Generate synthetic dataset for experimentation
-        
-        Args:
-            task: 'classification' or 'regression'
-            n_samples: Number of samples
-            n_features: Number of features
-            test_size: Test split ratio
-            random_state: Random seed
-            
-        Returns:
-            Tuple of (features DataFrame, target Series)
+        Only supports classification and regression tasks.
         """
         np.random.seed(random_state)
         
@@ -85,10 +77,122 @@ class DataPreprocessor:
             df = pd.DataFrame(X, columns=feature_names)
             df['target'] = y
         else:
-            raise ValueError(f"Unknown task: {task}")
+            raise ValueError(f"Synthetic data only supports classification/regression, not {task}")
         
         logger.info(f"Generated synthetic {task} dataset: {df.shape}")
         return df
+
+    async def generate_ai_data(
+        self, 
+        api_key: str, 
+        model: str, 
+        base_url: str,
+        user_description: str, 
+        n_samples: int,
+        task: str = "classification"
+    ):
+        """Generate realistic data using LLM to write the script"""
+        from llm_agent import create_agent
+        
+        prompt_templates = {
+            "classification": f"""Create a Python script to generate synthetic data for: "{user_description}"
+
+Requirements:
+1. Generate {n_samples} rows with MEANINGFUL column names (e.g., 'age', 'income', 'category')
+2. Include a 'target' column for classification task (0 or 1)
+3. Use realistic distributions (np.random.normal, uniform, choice)
+4. Save to: 'output.csv'
+5. Print columns at end: print(f"Columns: {{list(df.columns)}}")
+
+Return ONLY Python code, no markdown blocks.""",
+
+            "regression": f"""Create a Python script to generate synthetic data for: "{user_description}"
+
+Requirements:
+1. Generate {n_samples} rows with MEANINGFUL column names (e.g., 'age', 'income', 'years_experience')
+2. Include a 'target' column for regression task (continuous values)
+3. Use realistic distributions (np.random.normal, uniform)
+4. Save to: 'output.csv'
+5. Print columns at end: print(f"Columns: {{list(df.columns)}}")
+
+Return ONLY Python code, no markdown blocks.""",
+
+            "clustering": f"""Create a Python script to generate synthetic data for: "{user_description}"
+
+Requirements:
+1. Generate {n_samples} rows with MEANINGFUL column names (e.g., 'age', 'income', 'spending_score')
+2. NO target column - this is unsupervised clustering
+3. Create natural clusters/groups in the data using different distributions
+4. Save to: 'output.csv'
+5. Print columns at end: print(f"Columns: {{list(df.columns)}}")
+
+Return ONLY Python code, no markdown blocks.""",
+
+            "recommendation": f"""Create a Python script to generate synthetic data for: "{user_description}"
+
+Requirements:
+1. Generate {n_samples} rows for a content-based recommendation system
+2. Include columns: 'user_id', 'item_id', 'rating', and item feature columns
+3. Item features should describe items (e.g., 'genre_action', 'genre_comedy', 'year', 'duration')
+4. Use realistic distributions
+5. Save to: 'output.csv'
+6. Print columns at end: print(f"Columns: {{list(df.columns)}}")
+
+Return ONLY Python code, no markdown blocks."""
+        }
+        
+        prompt = prompt_templates.get(task, prompt_templates["classification"])
+        
+        agent = create_agent(api_key, model, base_url)
+        code = await agent._call_ai(prompt)
+        
+        if not code:
+            raise Exception("AI returned empty response")
+        
+        code = code.strip()
+        if "```python" in code:
+            code = code.split("```python")[1].split("```")[0]
+        elif "```" in code:
+            code = code.split("```")[1].split("```")[0]
+        
+        self.last_generated_code = code
+        
+        import tempfile, subprocess, sys, os
+        temp_dir = tempfile.mkdtemp()
+        script_path = os.path.join(temp_dir, "gen.py")
+        csv_path = os.path.join(temp_dir, "output.csv")
+        
+        with open(script_path, 'w', encoding='utf-8') as f:
+            f.write(code)
+        
+        result = subprocess.run(
+            [sys.executable, script_path],
+            capture_output=True, text=True, timeout=45, cwd=temp_dir
+        )
+        
+        if result.returncode != 0:
+            raise Exception(f"Script failed: {result.stderr[:200]}")
+        
+        if not os.path.exists(csv_path):
+            import glob
+            csv_files = glob.glob(os.path.join(temp_dir, "*.csv"))
+            if csv_files:
+                csv_path = csv_files[0]
+            else:
+                raise Exception("No CSV generated")
+        
+        df = pd.read_csv(csv_path)
+        
+        if task in ["classification", "regression"]:
+            target_col = 'target' if 'target' in df.columns else df.columns[-1]
+        elif task == "clustering":
+            target_col = None
+        elif task == "recommendation":
+            target_col = 'rating' if 'rating' in df.columns else None
+        else:
+            target_col = None
+        
+        return df, target_col, code
     
     def load_csv_data(
         self,
@@ -97,13 +201,6 @@ class DataPreprocessor:
     ) -> Tuple[pd.DataFrame, Optional[str]]:
         """
         Load CSV data from uploaded file
-        
-        Args:
-            file_content: File bytes
-            target_column: Name of target column (if None, uses last column)
-            
-        Returns:
-            Tuple of (DataFrame, target_column_name)
         """
         try:
             df = pd.read_csv(io.BytesIO(file_content))
@@ -123,25 +220,17 @@ class DataPreprocessor:
     def analyze_data(
         self,
         df: pd.DataFrame,
-        target_column: str
+        target_column: Optional[str],
+        task_type: str = "classification"
     ) -> DatasetInfo:
         """
         Analyze dataset and extract information
-        
-        Args:
-            df: Input DataFrame
-            target_column: Name of target column
-            
-        Returns:
-            DatasetInfo object with analysis results
         """
-        # Identify feature types
         numeric_features = df.select_dtypes(
             include=['int64', 'float64']
         ).columns.tolist()
         
-        # Remove target from features
-        if target_column in numeric_features:
+        if target_column and target_column in numeric_features:
             numeric_features.remove(target_column)
         
         categorical_features = [
@@ -149,18 +238,24 @@ class DataPreprocessor:
             if col not in numeric_features and col != target_column
         ]
         
-        # Count missing values
         missing_values = df.isnull().sum().to_dict()
         missing_values = {k: v for k, v in missing_values.items() if v > 0}
         
-        # Create summary
+        target_info = "N/A"
+        if target_column and target_column in df.columns:
+            if task_type in ["classification", "regression"]:
+                target_info = df[target_column].value_counts().head(10).to_string()
+            elif task_type == "recommendation":
+                target_info = f"Rating range: {df[target_column].min():.1f} - {df[target_column].max():.1f}, Mean: {df[target_column].mean():.2f}"
+        
         summary = f"""
 Dataset Shape: {df.shape}
+Task Type: {task_type}
 Numeric Features: {len(numeric_features)}
 Categorical Features: {len(categorical_features)}
 Missing Values: {len(missing_values)} columns with missing data
-Target Class Distribution:
-{df[target_column].value_counts().to_string() if target_column in df.columns else 'N/A'}
+Target Info:
+{target_info}
 """
         
         info = DatasetInfo(
@@ -171,7 +266,8 @@ Target Class Distribution:
             missing_values=missing_values,
             categorical_features=categorical_features,
             numeric_features=numeric_features,
-            data_summary=summary
+            data_summary=summary,
+            task_type=task_type
         )
         
         self.numeric_features = numeric_features
@@ -183,33 +279,23 @@ Target Class Distribution:
     def preprocess(
         self,
         df: pd.DataFrame,
-        target_column: str,
+        target_column: Optional[str],
         fit: bool = True
-    ) -> Tuple[pd.DataFrame, pd.Series]:
+    ) -> Tuple[pd.DataFrame, Optional[pd.Series]]:
         """
         Apply complete preprocessing pipeline
-        
-        Args:
-            df: Input DataFrame
-            target_column: Name of target column
-            fit: Whether to fit transformers or use existing
-            
-        Returns:
-            Tuple of (processed features, target)
         """
         df = df.copy()
         
-        # Separate features and target
-        X = df.drop(columns=[target_column])
-        y = df[target_column]
+        if target_column and target_column in df.columns:
+            X = df.drop(columns=[target_column])
+            y = df[target_column]
+        else:
+            X = df
+            y = None
         
-        # Handle missing values
         X = self._handle_missing_values(X, fit)
-        
-        # Encode categorical features
         X = self._encode_categorical(X, fit)
-        
-        # Scale numeric features
         X = self._scale_features(X, fit)
         
         logger.info("Data preprocessing complete")
@@ -226,14 +312,12 @@ Target Class Distribution:
         for col in X.columns:
             if X[col].isnull().any():
                 if X[col].dtype in ['int64', 'float64']:
-                    # Numeric: fill with median
                     fill_value = X[col].median()
-                    X[col].fillna(fill_value, inplace=True)
+                    X[col] = X[col].fillna(fill_value)
                     logger.info(f"Filled {col} with median: {fill_value:.2f}")
                 else:
-                    # Categorical: fill with mode
                     fill_value = X[col].mode()[0] if not X[col].mode().empty else 'unknown'
-                    X[col].fillna(fill_value, inplace=True)
+                    X[col] = X[col].fillna(fill_value)
                     logger.info(f"Filled {col} with mode: {fill_value}")
         
         return X
@@ -296,15 +380,6 @@ Target Class Distribution:
     ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.Series, pd.Series]:
         """
         Split data into train and test sets
-        
-        Args:
-            X: Features
-            y: Target
-            test_size: Test set ratio
-            random_state: Random seed
-            
-        Returns:
-            Tuple of (X_train, X_test, y_train, y_test)
         """
         X_train, X_test, y_train, y_test = train_test_split(
             X, y,
@@ -317,7 +392,6 @@ Target Class Distribution:
         return X_train, X_test, y_train, y_test
 
 
-# Utility functions
 def create_preprocessor() -> DataPreprocessor:
     """Create and return a new DataPreprocessor instance"""
     return DataPreprocessor()
@@ -331,15 +405,6 @@ def load_and_preprocess(
 ) -> Tuple[pd.DataFrame, str, DatasetInfo]:
     """
     Convenience function to load and analyze data
-    
-    Args:
-        file_content: Uploaded file bytes (None for synthetic)
-        task: ML task type
-        synthetic: Whether to generate synthetic data
-        target_column: Target column name
-        
-    Returns:
-        Tuple of (processed_df, target_col, dataset_info)
     """
     preprocessor = DataPreprocessor()
     
@@ -352,5 +417,5 @@ def load_and_preprocess(
             target_column
         )
     
-    dataset_info = preprocessor.analyze_data(df, target_column)
+    dataset_info = preprocessor.analyze_data(df, target_column, task)
     return df, target_column, dataset_info

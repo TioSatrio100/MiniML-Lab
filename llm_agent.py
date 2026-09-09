@@ -1,5 +1,5 @@
 """
-llm_agent.py - Autonomous ML Experimentation Agent (Optimized for Learning)
+llm_agent.py - Autonomous ML Experimentation Agent (SumoPod AI)
 """
 import os
 import sys
@@ -9,7 +9,7 @@ import logging
 from typing import Optional, Dict, Any, List
 from dataclasses import dataclass
 from enum import Enum
-import aiohttp
+from openai import AsyncOpenAI
 import asyncio
 import subprocess
 
@@ -25,8 +25,9 @@ class AgentState(Enum):
 
 @dataclass
 class AgentConfig:
-    openrouter_api_key: str
-    model: str = "meta-llama/llama-3-8b-instruct:free" # Default ke model yang lebih stabil
+    api_key: str
+    model: str = "gpt-4o-mini"
+    base_url: str = "https://ai.sumopod.com/v1"
     max_retries: int = 3
     temperature: float = 0.7
     max_tokens: int = 2500
@@ -47,7 +48,10 @@ class MLAgent:
         self.state = AgentState.PLANNING
         self.iteration = 0
         self.history: List[ExperimentResult] = []
-        self.base_url = "https://openrouter.ai/api/v1"
+        self.client = AsyncOpenAI(
+            api_key=config.api_key,
+            base_url=config.base_url
+        )
         
     async def generate_experiment_code(
         self,
@@ -58,84 +62,129 @@ class MLAgent:
         self.state = AgentState.PLANNING
         self.iteration += 1
         
-        # Build Context untuk Auto-Improvement
         context = self._build_learning_context(previous_results)
         
-        prompt = f"""You are an Elite AutoML Engineer. Your goal is to MAXIMIZE accuracy through iterative improvement.
+        prompt = self._build_prompt(task, dataset_info, context)
+        
+        raw_code = await self._call_ai(prompt)
+        if not raw_code: raise Exception("AI Empty Response")
+        
+        code = raw_code.strip()
+        if "```python" in code: code = code.split("```python")[1].split("```")[0]
+        elif "```" in code: code = code.split("```")[1].split("```")[0]
+        return code
 
-Task: {task}
+    def _build_prompt(self, task: str, dataset_info: Dict[str, Any], context: str) -> str:
+        """Build task-specific prompt"""
+        
+        base_info = f"""Task: {task}
 Dataset Info:
 - Shape: {dataset_info.get('shape')}
 - Features: {dataset_info.get('features')}
 - Target: {dataset_info.get('target')}
 
 {context}
-
-CRITICAL INSTRUCTIONS FOR IMPROVEMENT:
+"""
+        
+        if task == "classification":
+            return base_info + """
+CRITICAL INSTRUCTIONS FOR CLASSIFICATION:
 1. If previous iterations failed, FIX the errors first.
-2. If previous iterations succeeded but accuracy is low (<0.85), TRY DIFFERENT algorithms (e.g., switch from RandomForest to GradientBoosting, SVM, or XGBoost if available).
-3. Improve preprocessing: Try StandardScaler, handle outliers, or feature engineering.
-4. Tune hyperparameters: Don't just use defaults. Use GridSearchCV or manual tuning if possible.
+2. If accuracy is low (<0.85), TRY DIFFERENT algorithms (RandomForest, GradientBoosting, SVM, XGBoost).
+3. Improve preprocessing: StandardScaler, handle outliers, feature engineering.
+4. Tune hyperparameters for better accuracy.
 
 OUTPUT REQUIREMENTS:
 1. Generate ONLY executable Python code.
 2. Load data from `os.environ.get('DATA_PATH')`.
 3. Save best model as 'trained_model.pkl'.
 4. AT THE END, print exactly:
-   METRICS_JSON: {{"accuracy": val, "precision": val}}
+   METRICS_JSON: {"accuracy": val, "precision": val, "recall": val, "f1": val}
    MODEL_PATH: trained_model.pkl
 """
-        raw_code = await self._call_openrouter(prompt)
-        if not raw_code: raise Exception("LLM Empty Response")
-        
-        # Cleanup
-        code = raw_code.strip()
-        if "```python" in code: code = code.split("```python")[1].split("```")[0]
-        elif "```" in code: code = code.split("```")[1].split("```")[0]
-        return code
+
+        elif task == "regression":
+            return base_info + """
+CRITICAL INSTRUCTIONS FOR REGRESSION:
+1. If previous iterations failed, FIX the errors first.
+2. If R² is low (<0.8), TRY DIFFERENT algorithms (LinearRegression, Ridge, RandomForestRegressor, GradientBoostingRegressor).
+3. Improve preprocessing: StandardScaler, polynomial features, handle outliers.
+4. Tune hyperparameters for better R² and lower RMSE.
+
+OUTPUT REQUIREMENTS:
+1. Generate ONLY executable Python code.
+2. Load data from `os.environ.get('DATA_PATH')`.
+3. Save best model as 'trained_model.pkl'.
+4. AT THE END, print exactly:
+   METRICS_JSON: {"r2": val, "rmse": val, "mae": val}
+   MODEL_PATH: trained_model.pkl
+"""
+
+        elif task == "clustering":
+            return base_info + """
+CRITICAL INSTRUCTIONS FOR CLUSTERING:
+1. If previous iterations failed, FIX the errors first.
+2. This is UNSUPERVISED - there is NO target column.
+3. Try different algorithms: KMeans, DBSCAN, AgglomerativeClustering.
+4. Optimize silhouette score by trying different numbers of clusters.
+5. Use StandardScaler for feature normalization.
+
+OUTPUT REQUIREMENTS:
+1. Generate ONLY executable Python code.
+2. Load data from `os.environ.get('DATA_PATH')`.
+3. Save best model as 'trained_model.pkl'.
+4. AT THE END, print exactly:
+   METRICS_JSON: {"silhouette_score": val, "inertia": val, "n_clusters": val}
+   MODEL_PATH: trained_model.pkl
+"""
+
+        elif task == "recommendation":
+            return base_info + """
+CRITICAL INSTRUCTIONS FOR CONTENT-BASED RECOMMENDATION:
+1. If previous iterations failed, FIX the errors first.
+2. Build a content-based recommendation system using item features.
+3. Use cosine similarity or other similarity metrics.
+4. Evaluate using RMSE on predicted ratings.
+
+OUTPUT REQUIREMENTS:
+1. Generate ONLY executable Python code.
+2. Load data from `os.environ.get('DATA_PATH')`.
+3. Save best model as 'trained_model.pkl'.
+4. AT THE END, print exactly:
+   METRICS_JSON: {"rmse": val, "mae": val, "precision_at_k": val}
+   MODEL_PATH: trained_model.pkl
+"""
+
+        else:
+            raise ValueError(f"Unknown task type: {task}")
 
     def _build_learning_context(self, previous_results: Optional[List[ExperimentResult]]) -> str:
         if not previous_results:
-            return "This is the FIRST iteration. Start with a robust baseline model (e.g., RandomForest)."
+            return "This is the FIRST iteration. Start with a robust baseline model."
         
         context = "HISTORY OF PREVIOUS ATTEMPTS (Learn from this):\n"
-        for i, res in enumerate(previous_results[-3:], 1): # Ambil 3 terakhir
+        for i, res in enumerate(previous_results[-3:], 1):
             if res.state == AgentState.FAILED:
                 context += f"- Iteration {res.iteration}: FAILED. Error: {res.error[:150]}\n"
             else:
-                acc = res.metrics.get('accuracy', 0) if res.metrics else 0
-                context += f"- Iteration {res.iteration}: SUCCESS. Accuracy: {acc:.4f}. Metrics: {res.metrics}\n"
+                metrics_str = ", ".join([f"{k}={v:.4f}" for k, v in res.metrics.items()]) if res.metrics else "N/A"
+                context += f"- Iteration {res.iteration}: SUCCESS. Metrics: {metrics_str}\n"
         
-        context += "\nSTRATEGY: Beat the highest accuracy seen so far. If errors occurred, fix them."
+        context += "\nSTRATEGY: Beat the best metrics seen so far. If errors occurred, fix them."
         return context
 
-    async def _call_openrouter(self, prompt: str) -> Optional[str]:
-        headers = {
-            "Authorization": f"Bearer {self.config.openrouter_api_key}",
-            "Content-Type": "application/json",
-            "HTTP-Referer": "http://localhost:8501",
-            "X-Title": "MiniML Lab"
-        }
-        payload = {
-            "model": self.config.model,
-            "messages": [{"role": "user", "content": prompt}],
-            "temperature": self.config.temperature,
-            "max_tokens": self.config.max_tokens,
-        }
-        
+    async def _call_ai(self, prompt: str) -> Optional[str]:
         for attempt in range(self.config.max_retries):
             try:
-                async with aiohttp.ClientSession() as session:
-                    async with session.post(f"{self.base_url}/chat/completions", headers=headers, json=payload, timeout=aiohttp.ClientTimeout(total=90)) as response:
-                        if response.status == 429:
-                            await asyncio.sleep((attempt + 1) * 5)
-                            continue
-                        if response.status != 200:
-                            if attempt == self.config.max_retries - 1: raise Exception(f"API Error {response.status}")
-                            continue
-                        data = await response.json()
-                        return data["choices"][0]["message"]["content"]
+                response = await self.client.chat.completions.create(
+                    model=self.config.model,
+                    messages=[{"role": "user", "content": prompt}],
+                    temperature=self.config.temperature,
+                    max_tokens=self.config.max_tokens,
+                )
+                return response.choices[0].message.content
             except Exception as e:
+                logger.error(f"AI API error (attempt {attempt+1}): {e}")
                 if attempt == self.config.max_retries - 1: raise e
                 await asyncio.sleep(2)
         return None
@@ -145,7 +194,7 @@ OUTPUT REQUIREMENTS:
         import tempfile
         temp_dir = tempfile.mkdtemp()
         script_path = os.path.join(temp_dir, "exp.py")
-        with open(script_path, 'w') as f: f.write(code)
+        with open(script_path, 'w', encoding='utf-8') as f: f.write(code)
         
         try:
             process = subprocess.run([sys.executable, script_path], capture_output=True, text=True, timeout=120, env={**os.environ, "DATA_PATH": data_path}, cwd=temp_dir)
@@ -160,7 +209,7 @@ OUTPUT REQUIREMENTS:
         except Exception as e:
             return ExperimentResult(script=code, output=None, error=str(e), metrics=None, state=AgentState.FAILED, iteration=self.iteration)
         finally:
-            pass # Biarkan temp dir untuk debug jika perlu, atau hapus manual
+            pass
 
     def _extract_model_path(self, output: str, base_dir: str) -> Optional[str]:
         for line in output.splitlines():
@@ -172,10 +221,10 @@ OUTPUT REQUIREMENTS:
         if not output: return None
         import re
         try:
-            matches = re.findall(r'\{[^{}]*(?:"accuracy")[^{}]*\}', output)
+            matches = re.findall(r'\{[^{}]*(?:"accuracy"|"r2"|"rmse"|"silhouette_score")[^{}]*\}', output)
             if matches: return json.loads(matches[-1])
         except: pass
         return None
 
-def create_agent(api_key: str, model: str = "meta-llama/llama-3-8b-instruct:free") -> MLAgent:
-    return MLAgent(AgentConfig(openrouter_api_key=api_key, model=model))
+def create_agent(api_key: str, model: str = "gpt-4o-mini", base_url: str = "https://ai.sumopod.com/v1") -> MLAgent:
+    return MLAgent(AgentConfig(api_key=api_key, model=model, base_url=base_url))

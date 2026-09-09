@@ -4,6 +4,8 @@ pandas
 numpy
 requests
 python-dotenv
-aiohttp
+openai
 pydantic
 plotly
+matplotlib
+pillow

@@ -13,8 +13,301 @@ import plotly.graph_objects as go
 from llm_agent import create_agent, AgentState
 from data_pipeline import DataPreprocessor
 from model_manager import create_model_manager, create_experiment_tracker
+from visualization import create_training_progress_chart, get_task_metric
 
 st.set_page_config(page_title="MiniML Lab", page_icon="🤖", layout="wide")
+
+CUSTOM_CSS = """
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+:root {
+    --bg-cream: #fbfbfa;
+    --text-dark: #111111;
+    --text-muted: #555555;
+    --border-soft: #e5e5e0;
+    --accent-coral: #e06c53;
+    --accent-coral-light: #f5a88e;
+    --code-bg: #f5f2ef;
+}
+
+.stApp {
+    background-color: var(--bg-cream);
+    background-image: radial-gradient(circle, #d0d0d0 1px, transparent 1px);
+    background-size: 24px 24px;
+    font-family: 'Inter', sans-serif;
+}
+
+[data-testid="stHeader"] {
+    background-color: transparent;
+}
+
+[data-testid="stSidebar"] {
+    background-color: #ffffff;
+    border-right: 1px solid var(--border-soft);
+}
+
+[data-testid="stSidebar"] * {
+    font-family: 'Inter', sans-serif;
+}
+
+[data-testid="stSidebar"] .stMarkdown {
+    color: var(--text-dark);
+}
+
+h1, h2, h3, h4, h5, h6 {
+    font-family: 'Inter', sans-serif;
+    font-weight: 700;
+    color: var(--text-dark);
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+}
+
+p, span, label, .stMarkdown {
+    font-family: 'Inter', sans-serif;
+    color: var(--text-muted);
+}
+
+.eyebrow-text {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem;
+    color: #888888;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    margin-bottom: 0.5rem;
+}
+
+.hero-title {
+    font-size: 3rem;
+    font-weight: 800;
+    color: var(--text-dark);
+    line-height: 1.1;
+    letter-spacing: -0.03em;
+    margin-bottom: 1rem;
+}
+
+.hero-subtitle {
+    font-size: 1.1rem;
+    color: var(--text-muted);
+    line-height: 1.6;
+    max-width: 500px;
+}
+
+.code-block {
+    background-color: var(--code-bg);
+    border: 1px solid var(--border-soft);
+    border-radius: 8px;
+    padding: 1.5rem;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.85rem;
+    color: var(--text-dark);
+    overflow-x: auto;
+}
+
+.code-block .keyword {
+    color: var(--accent-coral);
+}
+
+.code-block .string {
+    color: #2a9d8f;
+}
+
+.code-block .comment {
+    color: #999999;
+}
+
+.stMetric {
+    background-color: #ffffff;
+    border: 1px solid var(--border-soft);
+    border-radius: 12px;
+    padding: 1.25rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+
+.stMetric label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+}
+
+.stMetric value {
+    font-family: 'Inter', sans-serif;
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--text-dark);
+}
+
+.stTabs [data-baseweb="tab-list"] {
+    gap: 0.5rem;
+    border-bottom: 1px solid var(--border-soft);
+}
+
+.stTabs [data-baseweb="tab"] {
+    font-family: 'Inter', sans-serif;
+    font-weight: 500;
+    font-size: 0.9rem;
+    color: var(--text-muted);
+    padding: 0.75rem 1.25rem;
+    border-radius: 8px 8px 0 0;
+    border: none;
+    background-color: transparent;
+}
+
+.stTabs [aria-selected="true"] {
+    color: var(--text-dark);
+    background-color: #ffffff;
+    border: 1px solid var(--border-soft);
+    border-bottom: 1px solid #ffffff;
+    margin-bottom: -1px;
+}
+
+.stButton > button {
+    font-family: 'Inter', sans-serif;
+    font-weight: 500;
+    border-radius: 8px;
+    padding: 0.5rem 1.25rem;
+    border: 1px solid var(--border-soft);
+    background-color: #ffffff;
+    color: var(--text-dark);
+    transition: all 0.2s ease;
+}
+
+.stButton > button:hover {
+    border-color: var(--accent-coral);
+    color: var(--accent-coral);
+}
+
+.stButton > button[kind="primary"] {
+    background-color: var(--accent-coral);
+    color: #ffffff;
+    border-color: var(--accent-coral);
+}
+
+.stButton > button[kind="primary"]:hover {
+    background-color: #c85a42;
+    border-color: #c85a42;
+    color: #ffffff;
+}
+
+.stTextInput input, .stSelectbox select, .stTextArea textarea, .stRadio label {
+    font-family: 'Inter', sans-serif;
+    border-radius: 6px;
+}
+
+.stTextInput input:focus, .stTextArea textarea:focus {
+    border-color: var(--accent-coral);
+    box-shadow: 0 0 0 1px var(--accent-coral);
+}
+
+.stDataFrame {
+    border: 1px solid var(--border-soft);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.stExpander {
+    border: 1px solid var(--border-soft);
+    border-radius: 8px;
+    background-color: #ffffff;
+}
+
+.stAlert {
+    border-radius: 8px;
+    border: 1px solid var(--border-soft);
+}
+
+.stAlert-success {
+    background-color: #f0f9f4;
+    border-color: #a8d5ba;
+}
+
+.stAlert-warning {
+    background-color: #fff8f0;
+    border-color: #ffd6a5;
+}
+
+.stAlert-info {
+    background-color: #f0f7ff;
+    border-color: #a8c5e0;
+}
+
+.stAlert-error {
+    background-color: #fef0f0;
+    border-color: #f5a8a8;
+}
+
+.hero-container {
+    display: flex;
+    gap: 3rem;
+    align-items: center;
+    margin-bottom: 3rem;
+}
+
+.hero-left {
+    flex: 1;
+}
+
+.hero-right {
+    flex: 1;
+}
+
+@media (max-width: 768px) {
+    .hero-container {
+        flex-direction: column;
+    }
+    .hero-title {
+        font-size: 2rem;
+    }
+}
+
+.divider {
+    height: 1px;
+    background: linear-gradient(to right, transparent, var(--border-soft), transparent);
+    margin: 2rem 0;
+}
+
+.status-badge {
+    display: inline-block;
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.status-badge-active {
+    background-color: #e8f5e9;
+    color: #2e7d32;
+}
+
+.status-badge-idle {
+    background-color: #f5f5f5;
+    color: #757575;
+}
+
+.progress-container {
+    background-color: #ffffff;
+    border: 1px solid var(--border-soft);
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin: 1rem 0;
+}
+
+.summary-card {
+    background-color: #ffffff;
+    border: 1px solid var(--border-soft);
+    border-radius: 8px;
+    padding: 1rem;
+    text-align: center;
+}
+</style>
+"""
+
+st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
 def init_session_state():
     if 'agent' not in st.session_state: st.session_state.agent = None
@@ -23,151 +316,356 @@ def init_session_state():
         st.session_state.model_manager = create_model_manager(os.path.join(os.getcwd(), "models"))
     if 'experiment_tracker' not in st.session_state: st.session_state.experiment_tracker = create_experiment_tracker()
     
-    # State untuk Data
     if 'current_dataset' not in st.session_state: st.session_state.current_dataset = None
     if 'current_target' not in st.session_state: st.session_state.current_target = None
+    if 'uploaded_file' not in st.session_state: st.session_state.uploaded_file = None
     
-    # State untuk Konfigurasi
     if 'api_key' not in st.session_state: st.session_state.api_key = ""
-    if 'selected_model' not in st.session_state: st.session_state.selected_model = "meta-llama/llama-3-8b-instruct:free"
+    if 'selected_model' not in st.session_state: st.session_state.selected_model = "gpt-4o-mini"
+    if 'base_url' not in st.session_state: st.session_state.base_url = "https://ai.sumopod.com/v1"
     if 'task_type' not in st.session_state: st.session_state.task_type = "classification"
-    if 'data_source' not in st.session_state: st.session_state.data_source = "Synthetic Data"
+    if 'data_source' not in st.session_state: st.session_state.data_source = "Synthetic (Random)"
+    if 'ai_description' not in st.session_state: st.session_state.ai_description = ""
+    if 'last_data_code' not in st.session_state: st.session_state.last_data_code = None
+    if 'max_iterations' not in st.session_state: st.session_state.max_iterations = 3
     
-    # State untuk Tracking Best Model
     if 'best_accuracy_so_far' not in st.session_state: st.session_state.best_accuracy_so_far = 0.0
     if 'best_model_name' not in st.session_state: st.session_state.best_model_name = "None"
+    if 'best_score_so_far' not in st.session_state: st.session_state.best_score_so_far = 0.0
 
 init_session_state()
 
 with st.sidebar:
-    st.markdown("## ⚙️ Config")
-    st.text_input("API Key", value=st.session_state.api_key, type="password", key="api_key_input")
-    st.selectbox("Model", ["meta-llama/llama-3-8b-instruct:free", "microsoft/phi-3-mini-128k-instruct:free", "baidu/cobuddy:free"], key="selected_model")
-    st.radio("Source", ["Synthetic", "Upload"], key="data_source")
-    st.selectbox("Task", ["classification", "regression"], key="task_type")
+    st.markdown('<p class="eyebrow-text">CONFIGURATION</p>', unsafe_allow_html=True)
+    st.markdown("### Settings")
     
-    if st.session_state.data_source == "Synthetic":
-        st.slider("Samples", 50, 1000, 200, key="n_samples")
-        st.slider("Features", 5, 50, 10, key="n_features")
+    st.text_input("API Key", value=st.session_state.api_key, type="password", key="api_key_input")
+    st.text_input("Base URL", value=st.session_state.base_url, key="base_url_input", help="API endpoint URL")
+    st.text_input("Model", value=st.session_state.selected_model, key="model_input", help="e.g., gpt-4o-mini, gpt-4o")
+    
+    if 'model_input' in st.session_state:
+        st.session_state.selected_model = st.session_state.model_input
+    if 'base_url_input' in st.session_state:
+        st.session_state.base_url = st.session_state.base_url_input
+    
+    st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
+    st.markdown('<p class="eyebrow-text">TASK TYPE</p>', unsafe_allow_html=True)
+    
+    task_type = st.radio(
+        "Task",
+        ["classification", "regression", "clustering", "recommendation"],
+        index=["classification", "regression", "clustering", "recommendation"].index(st.session_state.task_type),
+        key="task_type_radio",
+        label_visibility="collapsed"
+    )
+    st.session_state.task_type = task_type
+    
+    st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
+    st.markdown('<p class="eyebrow-text">DATA SOURCE</p>', unsafe_allow_html=True)
+    
+    if task_type in ["clustering", "recommendation"]:
+        st.info(f"This task type requires AI-generated data with specific structure.")
+        st.session_state.data_source = "AI-Generated (Smart)"
+        data_source_option = "AI-Generated (Smart)"
     else:
-        uploaded_file = st.file_uploader("CSV", type="csv")
+        data_source_option = st.radio(
+            "Source", 
+            ["Synthetic (Random)", "AI-Generated (Smart)", "Upload CSV"], 
+            key="data_source_radio",
+            label_visibility="collapsed"
+        )
+        st.session_state.data_source = data_source_option
 
-    st.slider("Iterations", 1, 10, 3, key="max_iterations")
+    if data_source_option == "AI-Generated (Smart)":
+        st.session_state.ai_description = st.text_area(
+            "Describe the data you need:",
+            value=st.session_state.ai_description,
+            placeholder="e.g., Customer data with age, income, and churn target" if task_type == "classification" else
+                        "e.g., House prices with sqft, bedrooms, location" if task_type == "regression" else
+                        "e.g., Customer behavior data for segmentation" if task_type == "clustering" else
+                        "e.g., Movie ratings with user_id, movie_id, genres",
+            height=80,
+            key="ai_desc_input"
+        )
+        
+    if data_source_option in ["Synthetic (Random)", "AI-Generated (Smart)"]:
+        st.slider("Samples", 50, 1000, 200, key="n_samples")
+    if data_source_option == "Synthetic (Random)":
+        st.slider("Features", 5, 50, 10, key="n_features")
+    elif data_source_option == "Upload CSV":
+        uploaded_file = st.file_uploader("Upload CSV", type="csv")
+        if uploaded_file:
+            st.session_state.uploaded_file = uploaded_file
+        else:
+            st.session_state.uploaded_file = None
+
+    st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
+    st.slider("Max Iterations", 1, 10, 3, key="max_iterations")
+
+def render_hero():
+    hero_col1, hero_col2 = st.columns([1, 1])
+    
+    with hero_col1:
+        st.markdown('<p class="eyebrow-text">AUTONOMOUS ML PLATFORM</p>', unsafe_allow_html=True)
+        st.markdown('<h1 class="hero-title">MiniML Lab</h1>', unsafe_allow_html=True)
+        st.markdown('<p class="hero-subtitle">An intelligent ML automation framework powered by LLM agents. Generate, execute, and optimize models autonomously through iterative self-improvement.</p>', unsafe_allow_html=True)
+        st.markdown('')
+        status_class = "status-badge-active" if st.session_state.api_key else "status-badge-idle"
+        status_text = "READY" if st.session_state.api_key else "NO API KEY"
+        st.markdown(f'<span class="status-badge {status_class}">{status_text}</span>', unsafe_allow_html=True)
+    
+    with hero_col2:
+        code_snippet = '''<span class="comment"># Auto-ML in 3 lines</span>
+<span class="keyword">from</span> miniml <span class="keyword">import</span> Agent
+
+agent = Agent(model=<span class="string">"gpt-4o-mini"</span>)
+result = agent.run(data)
+
+<span class="keyword">print</span>(result.accuracy)
+<span class="comment"># → 0.94</span>'''
+        st.markdown(f'<div class="code-block">{code_snippet}</div>', unsafe_allow_html=True)
 
 def main():
-    st.markdown("# 🤖 MiniML Lab: Auto-Improving Agent")
+    render_hero()
     
-    # Sync API Key
+    st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
+    
     if 'api_key_input' in st.session_state: st.session_state.api_key = st.session_state.api_key_input
     if not st.session_state.api_key:
-        st.warning("⚠️ Enter API Key.")
+        st.warning("Enter your API Key in the sidebar to begin.")
         return
 
-    # Display Best Model Status
-    col1, col2 = st.columns(2)
-    with col1:
-        st.metric("🏆 Best Accuracy So Far", f"{st.session_state.best_accuracy_so_far:.4f}")
-    with col2:
-        st.metric("📦 Best Model Name", st.session_state.best_model_name)
-
-    tab1, tab2, tab3 = st.tabs(["📊 Data", "🚀 Run Auto-ML", "💾 Artifacts"])
+    metric, metric_label, _ = get_task_metric(st.session_state.task_type)
     
-    # TAB 1: DATA
-    with tab1:
-        if st.session_state.data_source == "Synthetic":
-            if st.button("Generate Data"):
-                df = st.session_state.preprocessor.generate_synthetic_data(st.session_state.task_type, st.session_state.n_samples, st.session_state.n_features)
-                st.session_state.current_dataset = df
-                st.session_state.current_target = 'target'
-                st.success("Data Generated")
-        else:
-            if 'uploaded_file' in locals() and uploaded_file:
-                df, target = st.session_state.preprocessor.load_csv_data(uploaded_file.read(), None)
-                st.session_state.current_dataset = df
-                st.session_state.current_target = target
-                st.success("Data Loaded")
-        
-        if st.session_state.current_dataset is not None:
-            st.dataframe(st.session_state.current_dataset.head(), width='stretch')
+    metric_col1, metric_col2 = st.columns(2)
+    with metric_col1:
+        st.metric(f"Best {metric_label}", f"{st.session_state.best_score_so_far:.4f}")
+    with metric_col2:
+        st.metric("Best Model", st.session_state.best_model_name)
 
-    # TAB 2: RUN
+    st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
+
+    tab1, tab2, tab3, tab4 = st.tabs(["Data", "Run Auto-ML", "Artifacts", "Progress"])
+    
+    with tab1:
+        render_data_tab()
+
     with tab2:
-        if st.session_state.current_dataset is None:
-            st.warning("Prepare data first.")
+        render_run_tab()
+
+    with tab3:
+        render_artifacts_tab()
+
+    with tab4:
+        render_progress_tab()
+
+def render_data_tab():
+    data_source = st.session_state.data_source
+    
+    if data_source == "Synthetic (Random)":
+        if st.button("Generate Data"):
+            with st.spinner("Generating synthetic data..."):
+                df = st.session_state.preprocessor.generate_synthetic_data(
+                    st.session_state.task_type, 
+                    st.session_state.n_samples, 
+                    st.session_state.n_features
+                )
+                st.session_state.current_dataset = df
+                if st.session_state.task_type in ["classification", "regression"]:
+                    st.session_state.current_target = 'target'
+                else:
+                    st.session_state.current_target = None
+                st.success("Data generated successfully.")
+                st.rerun()
+    
+    elif data_source == "AI-Generated (Smart)":
+        if not st.session_state.ai_description:
+            st.warning("Please describe the data you need in the sidebar.")
             return
         
-        if st.session_state.agent is None:
-            if st.button("Initialize Agent"):
-                try:
-                    st.session_state.agent = create_agent(st.session_state.api_key, st.session_state.selected_model)
-                    st.success("Agent Ready")
-                except Exception as e: st.error(str(e))
-        else:
-            st.info("Agent Ready. Click 'Start Auto-ML Loop' to begin.")
-            if st.button("🚀 Start Auto-ML Loop", type="primary"):
-                run_auto_ml_loop(st.session_state.max_iterations)
+        if st.button("Generate Data with AI", type="primary"):
+            progress_bar = st.progress(0)
+            status_text = st.empty()
+            
+            try:
+                status_text.text("Sending request to AI...")
+                progress_bar.progress(10)
+                
+                status_text.text("AI is generating data script...")
+                progress_bar.progress(30)
+                
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                
+                df, target, code = loop.run_until_complete(
+                    st.session_state.preprocessor.generate_ai_data(
+                        api_key=st.session_state.api_key,
+                        model=st.session_state.selected_model,
+                        base_url=st.session_state.base_url,
+                        user_description=st.session_state.ai_description,
+                        n_samples=st.session_state.n_samples,
+                        task=st.session_state.task_type
+                    )
+                )
+                loop.close()
+                
+                st.session_state.last_data_code = code
+                
+                progress_bar.progress(70)
+                status_text.text("Loading generated data...")
+                
+                st.session_state.current_dataset = df
+                st.session_state.current_target = target
+                
+                progress_bar.progress(100)
+                status_text.text("Data generated successfully!")
+                time.sleep(0.5)
+                
+                st.success(f"Data generated: {df.shape[0]} rows, {df.shape[1]} columns")
+                st.rerun()
+                
+            except Exception as e:
+                st.error(f"Error generating data: {str(e)}")
+                progress_bar.progress(0)
+                status_text.text("")
+    
+    elif data_source == "Upload CSV":
+        if st.session_state.get('uploaded_file'):
+            if st.button("Load CSV Data"):
+                df, target = st.session_state.preprocessor.load_csv_data(
+                    st.session_state.uploaded_file.read(), None
+                )
+                st.session_state.current_dataset = df
+                st.session_state.current_target = target
+                st.success("Data loaded successfully.")
+                st.rerun()
+    
+    if st.session_state.current_dataset is not None:
+        st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
+        st.markdown("### Data Preview")
+        st.dataframe(st.session_state.current_dataset.head(20), use_container_width=True)
+        
+        if st.session_state.last_data_code:
+            with st.expander("View Generated Code"):
+                st.code(st.session_state.last_data_code, language="python")
 
-    # TAB 3: ARTIFACTS
-    with tab3:
-        models = st.session_state.model_manager.list_models()
-        if not models:
-            st.info("No best models saved yet. Run experiments to find one.")
+def render_run_tab():
+    if st.session_state.current_dataset is None:
+        st.warning("Prepare data first in the Data tab.")
+        return
+    
+    if st.session_state.agent is None:
+        if st.button("Initialize Agent"):
+            try:
+                st.session_state.agent = create_agent(
+                    api_key=st.session_state.api_key,
+                    model=st.session_state.selected_model,
+                    base_url=st.session_state.base_url
+                )
+                st.success("Agent initialized and ready.")
+                st.rerun()
+            except Exception as e: st.error(str(e))
+    else:
+        st.info(f"Agent is ready. Task: **{st.session_state.task_type}**. Click below to start the auto-ML loop.")
+        if st.button("Start Auto-ML Loop", type="primary"):
+            run_auto_ml_loop(st.session_state.max_iterations)
+
+def render_artifacts_tab():
+    models = st.session_state.model_manager.list_models()
+    if not models:
+        st.info("No models saved yet. Run experiments to find the best one.")
+    else:
+        st.success(f"Found {len(models)} top model(s).")
+        for m in models:
+            metric, metric_label, _ = get_task_metric(st.session_state.task_type)
+            score = m['metrics'].get(metric, 0)
+            with st.expander(f"{m['name']} ({metric_label}: {score:.4f})"):
+                st.json(m['metrics'])
+                if 'model' in m['artifacts'] and os.path.exists(m['artifacts']['model']):
+                    with open(m['artifacts']['model'], 'rb') as f:
+                        st.download_button("Download Model", f.read(), file_name=os.path.basename(m['artifacts']['model']), key=f"dl_{m['name']}")
+
+def render_progress_tab():
+    experiments = st.session_state.experiment_tracker.experiments
+    
+    if not experiments:
+        st.info("Run experiments to see training progress here.")
+        return
+    
+    fig = create_training_progress_chart(experiments, st.session_state.task_type)
+    st.plotly_chart(fig, use_container_width=True, key="progress_chart_tab")
+    
+    successful = [e for e in experiments if e.get('success', False)]
+    if successful:
+        metric, metric_label, higher_is_better = get_task_metric(st.session_state.task_type)
+        scores = [e['metrics'].get(metric, 0) for e in successful]
+        
+        if higher_is_better:
+            best_score = max(scores)
+            first_score = scores[0]
+            improvement = best_score - first_score
         else:
-            st.success(f"Found {len(models)} Top Models")
-            for m in models:
-                with st.expander(f"🏆 {m['name']} (Acc: {m['metrics'].get('accuracy', 0):.4f})"):
-                    st.json(m['metrics'])
-                    if 'model' in m['artifacts'] and os.path.exists(m['artifacts']['model']):
-                        with open(m['artifacts']['model'], 'rb') as f:
-                            st.download_button("Download Best Model", f.read(), file_name=os.path.basename(m['artifacts']['model']))
+            best_score = min(scores)
+            first_score = scores[0]
+            improvement = first_score - best_score
+        
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            st.metric("Total Iterations", len(experiments))
+        with col2:
+            st.metric("Successful", len(successful))
+        with col3:
+            st.metric(f"Best {metric_label}", f"{best_score:.4f}")
+        with col4:
+            st.metric("Improvement", f"{improvement:.4f}")
 
 def run_auto_ml_loop(num_iterations: int):
-    """
-    Loop utama yang menjalankan iterasi, memperbaiki diri, dan HANYA menyimpan jika lebih baik.
-    """
     progress_bar = st.progress(0)
     status_text = st.empty()
     log_container = st.empty()
+    graph_placeholder = st.empty()
     
     agent = st.session_state.agent
     preprocessor = st.session_state.preprocessor
     model_manager = st.session_state.model_manager
     
-    # Siapkan data
     data_path = os.path.join(tempfile.gettempdir(), "mini_ml_data.csv")
     st.session_state.current_dataset.to_csv(data_path, index=False)
     
     logs = []
+    metric, metric_label, higher_is_better = get_task_metric(st.session_state.task_type)
 
     for i in range(num_iterations):
-        status_text.text(f"🔄 Iteration {i+1}/{num_iterations}... Analyzing & Coding...")
+        status_text.text(f"Iteration {i+1}/{num_iterations} — Analyzing & generating code...")
         
         try:
-            # 1. Generate Code (dengan context history)
-            dataset_info = preprocessor.analyze_data(st.session_state.current_dataset, st.session_state.current_target)
+            dataset_info = preprocessor.analyze_data(
+                st.session_state.current_dataset, 
+                st.session_state.current_target,
+                st.session_state.task_type
+            )
             code = asyncio.run(agent.generate_experiment_code(
                 dataset_info=dataset_info.__dict__,
-                previous_results=agent.history, # Agent melihat history di sini
+                previous_results=agent.history,
                 task=st.session_state.task_type
             ))
             
-            status_text.text(f"⚙️ Iteration {i+1}: Executing...")
+            status_text.text(f"Iteration {i+1} — Executing experiment...")
             
-            # 2. Execute
             start = time.time()
             result = asyncio.run(agent.execute_code(code, data_path))
             duration = time.time() - start
             
-            # 3. Evaluate & Decide to Save
-            current_acc = result.metrics.get('accuracy', 0) if result.metrics else 0
-            best_acc = st.session_state.best_accuracy_so_far
+            current_score = result.metrics.get(metric, 0) if result.metrics else 0
+            best_score = st.session_state.best_score_so_far
             
-            log_msg = f"Iter {i+1}: Acc={current_acc:.4f} | Status={result.state.value}"
+            log_msg = f"Iter {i+1}: {metric_label}={current_score:.4f} | Status={result.state.value}"
             
             if result.state == AgentState.COMPLETED:
-                if current_acc > best_acc:
-                    # NEW RECORD! Simpan model
-                    with st.spinner(f"✨ New Best Model Found! ({current_acc:.4f} > {best_acc:.4f}) Saving..."):
+                is_better = (current_score > best_score) if higher_is_better else (current_score < best_score and current_score > 0)
+                
+                if is_better:
+                    with st.spinner(f"New best model found ({current_score:.4f}). Saving..."):
                         try:
                             if result.saved_model_path and os.path.exists(result.saved_model_path):
                                 with open(result.saved_model_path, 'rb') as f:
@@ -180,18 +678,16 @@ def run_auto_ml_loop(num_iterations: int):
                                     metrics=result.metrics,
                                     code=code
                                 )
-                                # Update Global State
-                                st.session_state.best_accuracy_so_far = current_acc
+                                st.session_state.best_score_so_far = current_score
                                 st.session_state.best_model_name = model_name
-                                log_msg += " | 🏆 NEW BEST SAVED"
+                                log_msg += " | NEW BEST SAVED"
                         except Exception as e:
                             log_msg += f" | Save Error: {e}"
                 else:
-                    log_msg += f" | Discarded (Best: {best_acc:.4f})"
+                    log_msg += f" | Discarded (Best: {best_score:.4f})"
             else:
-                log_msg += f" | Failed: {result.error[:50]}"
+                log_msg += f" | Failed: {result.error[:50] if result.error else 'Unknown'}"
                 
-            # Log ke tracker
             st.session_state.experiment_tracker.log_experiment(
                 iteration=i+1, code=code, execution_time=duration, 
                 success=(result.state==AgentState.COMPLETED), 
@@ -199,7 +695,13 @@ def run_auto_ml_loop(num_iterations: int):
             )
             
             logs.append(log_msg)
-            log_container.code("\n".join(logs[-5:])) # Tampilkan 5 log terakhir
+            log_container.code("\n".join(logs[-5:]))
+            
+            fig = create_training_progress_chart(
+                st.session_state.experiment_tracker.experiments,
+                st.session_state.task_type
+            )
+            graph_placeholder.plotly_chart(fig, use_container_width=True, key=f"progress_chart_iter_{i}")
             
         except Exception as e:
             logs.append(f"Iter {i+1}: CRITICAL ERROR - {str(e)}")
@@ -207,9 +709,9 @@ def run_auto_ml_loop(num_iterations: int):
 
         progress_bar.progress((i + 1) / num_iterations)
     
-    status_text.text("✅ Auto-ML Loop Completed!")
+    status_text.text("Auto-ML loop completed.")
     st.balloons()
-    st.rerun() # Refresh untuk update metric di atas
+    st.rerun() 
 
 if __name__ == "__main__":
     main()

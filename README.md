@@ -1,353 +1,281 @@
-# 🤖 MiniML Lab - Autonomous ML Experimentation Platform
+# MiniML Lab - Autonomous ML Experimentation Platform
 
-An intelligent ML automation framework powered by LLM agents, enabling autonomous generation, execution, and optimization of ML models.
+An intelligent ML automation framework powered by LLM agents. Generate, execute, and optimize models autonomously through iterative self-improvement.
 
-## 📋 Features
+## Features
 
-### 🧠 Autonomous ML Agent
-- **LLM-Powered Code Generation**: Uses OpenRouter API (Llama 2, GPT-4, Claude) to generate Python training scripts
-- **Self-Correcting Loops**: Analyzes failures and automatically improves code
-- **Iterative Learning**: Learns from previous experiments to make better models
-- Inspired by Karpathy's autoresearch approach
+### 4 Task Types
+- **Classification** — Accuracy, Precision, Recall, F1 metrics
+- **Regression** — R², RMSE, MAE metrics
+- **Clustering** — Silhouette Score, Inertia (unsupervised, AI-generated data only)
+- **Recommendation** — Content-based, RMSE, Precision@K (AI-generated data only)
 
-### 🛡️ Sandboxed Execution
-- **Secure Subprocess Isolation**: AI-generated code runs in isolated subprocess
-- **Runtime Error Capturing**: Automatically captures and logs execution errors
-- **Timeout Protection**: 60-second execution timeout prevents infinite loops
-- **Resource Management**: Clean temporary file handling
+### AI-Powered Agent
+- **LLM Code Generation** — Uses SumoPod AI (OpenAI-compatible API) to generate Python training scripts
+- **Self-Correcting Loops** — Analyzes failures and automatically improves code
+- **Iterative Learning** — Learns from previous experiments to beat the best score
+- **Any Model** — Type any model name (gpt-4o-mini, gpt-4o, claude-3-sonnet, etc.)
 
-### 📊 Data Pipeline
-- **Synthetic Data Generation**: Create classification/regression datasets on-demand
-- **CSV Upload Support**: Load your own datasets
-- **Automated Preprocessing**:
-  - Missing value handling (median for numeric, mode for categorical)
-  - Categorical encoding with LabelEncoder
-  - Feature scaling with StandardScaler
-  - Train/test splitting with stratification
+### Data Pipeline
+- **Synthetic Data** — Generate classification/regression datasets on-demand (sklearn)
+- **AI-Generated Data** — Describe your dataset in plain English, AI writes the generation script
+- **CSV Upload** — Load your own datasets
+- **Automated Preprocessing** — Missing values, categorical encoding, feature scaling
 
-### 📈 Interactive Dashboard
-- **Real-time Monitoring**: Track agent reasoning and experiment progress
-- **Performance Metrics**: View accuracy, precision, recall, and F1 scores
-- **Visualization**: Plotly charts for performance trends
-- **One-Click Downloads**: Export models, code, and metadata
+### Real-Time Progress Visualization
+- **Interactive Plotly Chart** — Metric evolution across iterations with color-coded dots
+- **Live Updates** — Graph refreshes after each iteration completes
+- **Best Point Highlight** — Star marker on the best iteration
+- **Summary Stats** — Total iterations, successful count, best score, improvement
 
-### 💾 Model Management
-- **Artifact Storage**: Save models, training code, and metadata
-- **Performance Tracking**: Complete experiment history with metrics
-- **Model Comparison**: Identify best performing models
-- **Report Generation**: Automated experiment summaries
+### Design System
+- Off-white/cream background with dot-matrix pattern
+- Inter font for UI, JetBrains Mono for code/technical elements
+- Terracotta/coral (#e06c53) accent color
+- Clean card-based layout with soft borders
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Prerequisites
 - Python 3.8+
-- OpenRouter API key (get at https://openrouter.ai)
+- SumoPod AI API key (https://ai.sumopod.com)
 
 ### Installation
 
-1. **Clone and setup environment**
 ```bash
-cd MiniML-Lab
+cd MiniML_Lab
 python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-```
+venv\Scripts\activate        # Windows
+# source venv/bin/activate   # macOS/Linux
 
-2. **Install dependencies**
-```bash
 pip install -r requirements.txt
 ```
 
-3. **Configure API**
-```bash
-cp .env.example .env
-# Edit .env and add your OPENROUTER_API_KEY
-```
-
-### Running the Application
+### Running
 
 ```bash
 streamlit run app.py
 ```
 
-The dashboard will open at `http://localhost:8501`
+Dashboard opens at `http://localhost:8501`
 
-## 📚 Project Structure
+## Configuration
 
-```
-MiniML-Lab/
-├── app.py                 # Main Streamlit application
-├── llm_agent.py          # Autonomous ML agent implementation
-├── data_pipeline.py      # Data preprocessing and analysis
-├── model_manager.py      # Model artifact management
-├── requirements.txt      # Python dependencies
-├── .env.example          # Environment variables template
-└── README.md             # This file
-```
+Configure everything from the sidebar:
 
-## 🔧 Configuration
+| Setting | Description | Default |
+|---------|-------------|---------|
+| API Key | Your SumoPod AI API key | — |
+| Base URL | API endpoint | `https://ai.sumopod.com/v1` |
+| Model | Any model name | `gpt-4o-mini` |
+| Task Type | classification, regression, clustering, recommendation | classification |
+| Data Source | Synthetic, AI-Generated, Upload CSV | Synthetic |
+| Max Iterations | Number of Auto-ML iterations | 3 |
 
-### Environment Variables (.env)
+### Data Source Restrictions
 
-```env
-# API Configuration
-OPENROUTER_API_KEY=your_key_here
-OPENROUTER_MODEL=meta-llama/llama-2-70b-chat
+| Task | Synthetic | AI-Generated | Upload CSV |
+|------|-----------|--------------|------------|
+| Classification | Yes | Yes | Yes |
+| Regression | Yes | Yes | Yes |
+| Clustering | — | Yes | — |
+| Recommendation | — | Yes | — |
 
-# Execution Settings
-MAX_EXECUTION_TIME=30          # Seconds
-MAX_RETRIES=3                  # Number of retries
-SANDBOX_TIMEOUT=60             # Seconds
+Clustering and Recommendation require AI-generated data because they need specific structures (natural groupings, user-item matrices).
 
-# Data Settings
-MAX_UPLOAD_SIZE_MB=100
-SUPPORTED_FILE_TYPES=csv,xlsx,json
+## Usage Guide
 
-# Logging
-LOG_LEVEL=INFO
-DEBUG_MODE=False
-```
+### 1. Configure API
+Enter your SumoPod AI API key, base URL, and model name in the sidebar.
 
-### Streamlit Settings
+### 2. Select Task Type
+Choose from classification, regression, clustering, or recommendation.
 
-Access settings in the left sidebar:
-- **API Settings**: Configure OpenRouter API and model selection
-- **Data Settings**: Choose between synthetic/uploaded data
-- **Experiment Settings**: Configure iteration limits and auto-improvement
+### 3. Prepare Data
+- **Synthetic**: Set samples/features and click "Generate Data"
+- **AI-Generated**: Describe your dataset, click "Generate Data with AI" (shows progress bar)
+- **CSV Upload**: Upload a file and click "Load CSV Data"
 
-## 💡 Usage Guide
+### 4. Run Auto-ML
+Click "Initialize Agent", then "Start Auto-ML Loop". The agent will:
+1. Analyze your data
+2. Generate training code
+3. Execute in a sandboxed subprocess
+4. Evaluate metrics
+5. Save only if it beats the previous best
+6. Repeat, learning from each iteration
 
-### 1. Data Preparation
+### 5. Monitor Progress
+Switch to the **Progress** tab to see:
+- Real-time metric chart with color-coded iterations
+- Summary cards: total iterations, successful, best score, improvement
 
-1. Navigate to **Data Preparation** tab
-2. Choose data source:
-   - **Synthetic Data**: Auto-generate dataset for testing
-   - **Upload CSV**: Use your own data
-3. Preview data and review statistics
+### 6. Download Artifacts
+In the **Artifacts** tab, download the best model (.pkl), view metrics, and inspect training code.
 
-### 2. Agent Initialization
+## Architecture
 
-1. Enter OpenRouter API key in sidebar
-2. Click **Initialize Agent** button
-3. Agent is ready for experiments
+### Loop Engineering Pattern
 
-### 3. Run Experiments
+MiniML Lab implements **loop engineering** — an iterative feedback loop where the system continuously improves through structured learning cycles.
 
-- **Run Single Iteration**: Generate, execute, and evaluate one model
-- **Run Multiple**: Automatically improve over multiple iterations
-- Agent automatically handles failures with self-correction
+**Core Loop Components:**
 
-### 4. Monitor Results
+1. **Iterative Feedback Loop** — Each iteration passes the last 3 results (successes + failures) to the LLM as context
+2. **Self-Correction** — Failed iterations feed error messages back to the LLM for the next attempt
+3. **Progressive Improvement** — Agent is instructed to try different algorithms if metrics are low
+4. **Learning Context Builder** — Constructs a prompt showing previous attempts with metrics and errors
 
-- **Experiment Log**: View each iteration's status and metrics
-- **Performance Trends**: Visualize accuracy improvement over time
-- **Detailed Report**: Download comprehensive analysis
-
-### 5. Download Models
-
-- **Model File**: Serialized pickle object (.pkl)
-- **Training Code**: Python script that trained the model (.py)
-- **Metadata**: Model metrics and configuration (.json)
-
-## 🏗️ Architecture
-
-### Agent Loop
+**The Loop:**
 
 ```
-┌─────────────────────────────────────┐
-│  Generate Experiment Code (LLM)     │
-└──────────────┬──────────────────────┘
-               │
-               ▼
-┌─────────────────────────────────────┐
-│  Execute Code (Sandbox)             │
-└──────────────┬──────────────────────┘
-               │
-          ┌────┴────┐
-          │          │
-       Success    Failure
-          │          │
-          │          ▼
-          │  ┌──────────────────────┐
-          │  │ Analyze Error (LLM)  │
-          │  └──────────┬───────────┘
-          │             │
-          │             ▼
-          │  ┌──────────────────────┐
-          │  │ Generate Fix         │
-          │  └──────────┬───────────┘
-          │             │
-          └─────┬───────┘
-                │
-                ▼
-        ┌──────────────────┐
-        │  Store Results   │
-        └──────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│                    ITERATION N                               │
+├─────────────────────────────────────────────────────────────┤
+│                                                              │
+│  ┌──────────────────┐                                       │
+│  │ Analyze Data &   │                                       │
+│  │ Build Prompt     │◄──── Previous Results (last 3)        │
+│  │ (with context)   │      - Iter 1: FAILED (error: ...)    │
+│  └────────┬─────────┘      - Iter 2: SUCCESS (acc=0.85)    │
+│           │                  - Iter 3: SUCCESS (acc=0.87)   │
+│           ▼                                                   │
+│  ┌──────────────────┐                                       │
+│  │ Generate Code    │                                       │
+│  │ (LLM)            │                                       │
+│  └────────┬─────────┘                                       │
+│           │                                                   │
+│           ▼                                                   │
+│  ┌──────────────────┐                                       │
+│  │ Execute Code     │                                       │
+│  │ (Sandboxed)      │                                       │
+│  └────────┬─────────┘                                       │
+│           │                                                   │
+│      ┌────┴────┐                                            │
+│      │         │                                            │
+│   Success   Failure                                         │
+│      │         │                                            │
+│      │         ▼                                            │
+│      │  ┌────────────────┐                                 │
+│      │  │ Log Error      │─────────────────────────┐       │
+│      │  │ (truncated)    │                         │       │
+│      │  └────────────────┘                         │       │
+│      │                                             │       │
+│      ▼                                             │       │
+│  ┌──────────────┐                                  │       │
+│  │ Better than  │──No──→ Discard                   │       │
+│  │ current best?│                                  │       │
+│  └──────┬───────┘                                  │       │
+│         │ Yes                                      │       │
+│         ▼                                          │       │
+│  ┌──────────────┐                                  │       │
+│  │ Save Model   │                                  │       │
+│  │ Update Chart │                                  │       │
+│  └──────┬───────┘                                  │       │
+│         │                                          │       │
+│         └──────────────────────────────────────────┘       │
+│                    │                                        │
+│                    ▼                                        │
+│         Store in agent.history                              │
+│         (feeds next iteration)                              │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+                    ┌──────────────────┐
+                    │ ITERATION N+1    │
+                    │ (sees this result│
+                    │  in context)     │
+                    └──────────────────┘
 ```
 
-### Data Pipeline
+**Key Implementation Details:**
+
+- **Learning Context** (`llm_agent.py:_build_learning_context`):
+  - Shows last 3 iterations with status and metrics
+  - Failed iterations include truncated error messages
+  - Successful iterations show all metrics (accuracy, precision, etc.)
+  - Instructs agent: "Beat the best metrics seen so far. If errors occurred, fix them."
+
+- **Best-Only Strategy**:
+  - Only saves models that beat the previous best score
+  - Tracks `best_score_so_far` across all iterations
+  - Discards models that don't improve (even if successful)
+
+- **Task-Specific Prompts**:
+  - Classification: "If accuracy < 0.85, try different algorithms"
+  - Regression: "If R² < 0.8, try different algorithms"
+  - Clustering: "Optimize silhouette score by trying different cluster counts"
+  - Recommendation: "Evaluate using RMSE on predicted ratings"
+
+This creates a **self-improving system** where each iteration learns from the past, avoiding repeated mistakes and progressively discovering better models.
+
+## Task-Specific Metrics
+
+| Task | Primary Metric | Direction | Other Metrics |
+|------|---------------|-----------|---------------|
+| Classification | Accuracy | Higher is better | Precision, Recall, F1 |
+| Regression | R² Score | Higher is better | RMSE, MAE |
+| Clustering | Silhouette Score | Higher is better | Inertia, N Clusters |
+| Recommendation | RMSE | Lower is better | MAE, Precision@K |
+
+## Project Structure
 
 ```
-Input Data
-    │
-    ├─→ [Synthetic] Generate random features
-    │
-    └─→ [CSV Upload] Parse and validate
-            │
-            ▼
-    [Analysis] Extract metadata
-            │
-            ├─→ Identify feature types
-            ├─→ Count missing values
-            └─→ Check data distribution
-            │
-            ▼
-    [Preprocessing]
-            │
-            ├─→ Handle missing values
-            ├─→ Encode categorical features
-            ├─→ Scale numeric features
-            └─→ Split train/test
-            │
-            ▼
-        Ready for ML
+MiniML_Lab/
+├── app.py                 # Main Streamlit application + design system
+├── llm_agent.py           # Autonomous ML agent (SumoPod AI / OpenAI-compatible)
+├── data_pipeline.py       # Data preprocessing, synthetic & AI generation
+├── model_manager.py       # Model artifact management & experiment tracking
+├── visualization.py       # Plotly charts & Matplotlib visualizations
+├── requirements.txt       # Python dependencies
+├── .env.example           # Environment variables template
+├── fonts/                 # Custom fonts (Inter, JetBrains Mono)
+├── models/                # Saved model artifacts
+└── README.md              # This file
 ```
 
-## 🔐 Security Considerations
+## Dependencies
 
-### Code Execution Safety
-- ✅ Subprocess isolation prevents access to host system
-- ✅ 60-second timeout prevents infinite loops
-- ✅ Generated code is inspected before execution in production
-- ⚠️ Never run with untrusted API keys
+| Package | Purpose |
+|---------|---------|
+| streamlit | Web dashboard |
+| scikit-learn | ML models & synthetic data |
+| pandas | Data manipulation |
+| numpy | Numerical computing |
+| openai | SumoPod AI API client |
+| plotly | Interactive charts |
+| matplotlib | Static visualizations |
+| python-dotenv | Environment variables |
+| pillow | Image handling |
 
-### Data Privacy
-- ✅ Data processed locally, not sent to external services
-- ✅ Models saved to local filesystem
-- ⚠️ API calls to OpenRouter may send dataset summaries
+## Troubleshooting
 
-### Best Practices
-1. Use dedicated API key with API limits
-2. Run on isolated machine for sensitive data
-3. Monitor execution logs for anomalies
-4. Validate generated code before production
+### "API Key not found"
+Enter your SumoPod AI API key in the sidebar.
 
-## 📊 Supported Models
+### "Timeout during code execution"
+Generated code has a 120-second timeout. Simplify the model or increase data samples.
 
-### Classification Models Generated
-- Logistic Regression
-- Random Forest
-- Gradient Boosting
-- SVM
-- Neural Networks (via sklearn)
+### "Script failed" during AI data generation
+The AI-generated script may have errors. Check the error message and try rephrasing your data description.
 
-### Regression Models
-- Linear Regression
-- Ridge/Lasso
-- Random Forest Regressor
-- Gradient Boosting Regressor
+### "Cannot find module 'xxx'"
+Run `pip install -r requirements.txt` again.
 
-### LLM Options (via OpenRouter)
-- Meta Llama 2 70B
-- OpenAI GPT-3.5 Turbo
-- OpenAI GPT-4
-- Anthropic Claude 2
-- And 100+ more
+### Encoding errors on Windows
+All file writes use UTF-8 encoding. If you see charmap errors, ensure your terminal supports UTF-8.
 
-## 🧪 Example Workflows
+## Contributing
 
-### Workflow 1: Quick Classification Test
-```
-1. Use Synthetic Data → Classification → 200 samples
-2. Run Single Iteration → View generated code
-3. Check Performance → Download best model
-```
+Areas for enhancement:
+- Deep learning models (PyTorch, TensorFlow)
+- Hyperparameter optimization (Optuna)
+- Ensemble model generation
+- Feature engineering automation
+- Distributed execution
+- REST API
 
-### Workflow 2: Improve Existing Dataset
-```
-1. Upload your CSV file
-2. Run Multiple Iterations (5 loops)
-3. View performance trends
-4. Download best model and code
-```
+## License
 
-### Workflow 3: Debug Failed Experiments
-```
-1. Run iteration → See failure
-2. Enable "Auto-Improve on Failure"
-3. Agent analyzes error and fixes code
-4. Retry with improved version
-```
-
-## 🐛 Troubleshooting
-
-### Issue: "API Key not found"
-**Solution**: Ensure OPENROUTER_API_KEY is set in .env file
-
-### Issue: "Timeout during code execution"
-**Solution**: Increase MAX_EXECUTION_TIME in .env or simplify model
-
-### Issue: "Out of memory"
-**Solution**: Reduce n_samples in data settings or run on machine with more RAM
-
-### Issue: "Cannot find module 'xxx'"
-**Solution**: Run `pip install -r requirements.txt` again
-
-## 📈 Performance Tips
-
-1. **Start Small**: Begin with synthetic data and few features
-2. **Monitor Logs**: Check experiment logs for patterns in failures
-3. **Adjust Temperature**: Lower for more deterministic code, higher for creativity
-4. **Use Better Models**: GPT-4 generates more reliable code than Llama 2
-5. **Increase Max Retries**: More iterations = better refinement
-
-## 📝 Logging
-
-Logs are stored in console output. Configure in .env:
-```env
-LOG_LEVEL=INFO  # DEBUG, INFO, WARNING, ERROR
-DEBUG_MODE=True # Enables detailed output
-```
-
-## 🤝 Contributing
-
-Contributions welcome! Areas for enhancement:
-- Additional preprocessing strategies
-- Support for time-series models
-- AutoML integration (AutoGluon, TPOT)
-- Distributed experiment execution
-- GPU support
-
-## 📜 License
-
-MIT License - See LICENSE file
-
-## 🔗 Resources
-
-- **OpenRouter Docs**: https://openrouter.ai/docs
-- **Streamlit Docs**: https://docs.streamlit.io
-- **Scikit-Learn Docs**: https://scikit-learn.org
-- **Karpathy's AutoResearch**: https://github.com/karpathy/researcher
-
-## 🎯 Roadmap
-
-- [ ] Support for deep learning models (PyTorch, TensorFlow)
-- [ ] Hyperparameter optimization with Optuna
-- [ ] Ensemble model generation
-- [ ] Feature engineering automation
-- [ ] Multi-objective optimization
-- [ ] Distributed execution
-- [ ] WebUI with real-time visualization
-- [ ] REST API
-
-## 📧 Support
-
-For issues, questions, or suggestions:
-1. Check troubleshooting section
-2. Review logs for error messages
-3. Open GitHub issue with details
-
----
-
-**Made with ❤️ for the ML community**
-
-Happy experimenting! 🚀
+MIT License

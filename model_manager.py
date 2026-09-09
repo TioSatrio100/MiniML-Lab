@@ -52,14 +52,14 @@ class ModelManager:
             }
             
             metadata_path = os.path.join(self.artifacts_dir, f"{model_name}_metadata.json")
-            with open(metadata_path, 'w') as f:
-                json.dump(metadata_dict, f, indent=2)
+            with open(metadata_path, 'w', encoding='utf-8') as f:
+                json.dump(metadata_dict, f, indent=2, ensure_ascii=False)
             artifacts['metadata'] = metadata_path
             
             # Save Code
             if code:
                 code_path = os.path.join(self.artifacts_dir, f"{model_name}_code.py")
-                with open(code_path, 'w') as f:
+                with open(code_path, 'w', encoding='utf-8') as f:
                     f.write(code)
                 artifacts['code'] = code_path
             
