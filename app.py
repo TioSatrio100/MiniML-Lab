@@ -341,10 +341,39 @@ with st.sidebar:
     
     st.text_input("API Key", value=st.session_state.api_key, type="password", key="api_key_input")
     st.text_input("Base URL", value=st.session_state.base_url, key="base_url_input", help="API endpoint URL")
-    st.text_input("Model", value=st.session_state.selected_model, key="model_input", help="e.g., gpt-4o-mini, gpt-4o")
     
-    if 'model_input' in st.session_state:
-        st.session_state.selected_model = st.session_state.model_input
+    # Enhanced Model Selection
+    st.markdown("#### LLM Model")
+    st.markdown("Choose or enter a model name")
+    
+    # Preset model options
+    common_models = ["gpt-4o-mini", "gpt-4o", "gpt-4-turbo", "claude-3-haiku", "claude-3-sonnet", "claude-3-opus"]
+    
+    # Create tabs for quick selection or custom input
+    model_tab1, model_tab2 = st.tabs(["Presets", "Custom"])
+    
+    with model_tab1:
+        selected_preset = st.selectbox(
+            "Popular Models:",
+            common_models,
+            index=common_models.index(st.session_state.selected_model) if st.session_state.selected_model in common_models else 0,
+            key="model_preset_select"
+        )
+        st.session_state.selected_model = selected_preset
+    
+    with model_tab2:
+        custom_model = st.text_input(
+            "Enter model name:",
+            value=st.session_state.selected_model,
+            placeholder="e.g., gpt-4o-mini",
+            key="model_input"
+        )
+        if custom_model:
+            st.session_state.selected_model = custom_model
+    
+    # Display current model
+    st.info(f"📌 Using: **{st.session_state.selected_model}**")
+    
     if 'base_url_input' in st.session_state:
         st.session_state.base_url = st.session_state.base_url_input
     
@@ -554,20 +583,35 @@ def render_run_tab():
         st.warning("Prepare data first in the Data tab.")
         return
     
+    # Display current configuration
+    st.markdown("### Run Configuration")
+    config_col1, config_col2, config_col3 = st.columns(3)
+    with config_col1:
+        st.metric("Task Type", st.session_state.task_type.title())
+    with config_col2:
+        st.metric("LLM Model", st.session_state.selected_model)
+    with config_col3:
+        st.metric("Max Iterations", st.session_state.max_iterations)
+    
+    st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
+    
     if st.session_state.agent is None:
-        if st.button("Initialize Agent"):
+        st.markdown("### Initialize Agent")
+        st.markdown(f"Ready to use **{st.session_state.selected_model}** for generating ML experiments.")
+        if st.button("Initialize Agent", type="primary"):
             try:
                 st.session_state.agent = create_agent(
                     api_key=st.session_state.api_key,
                     model=st.session_state.selected_model,
                     base_url=st.session_state.base_url
                 )
-                st.success("Agent initialized and ready.")
+                st.success(f"✓ Agent initialized with model: {st.session_state.selected_model}")
                 st.rerun()
             except Exception as e: st.error(str(e))
     else:
-        st.info(f"Agent is ready. Task: **{st.session_state.task_type}**. Click below to start the auto-ML loop.")
-        if st.button("Start Auto-ML Loop", type="primary"):
+        st.markdown("### Auto-ML Loop")
+        st.success(f"✓ Agent is ready. Using model: **{st.session_state.selected_model}** for task: **{st.session_state.task_type}**")
+        if st.button("Start Auto-ML Loop", type="primary", key="start_automl"):
             run_auto_ml_loop(st.session_state.max_iterations)
 
 def render_artifacts_tab():
@@ -575,15 +619,94 @@ def render_artifacts_tab():
     if not models:
         st.info("No models saved yet. Run experiments to find the best one.")
     else:
-        st.success(f"Found {len(models)} top model(s).")
-        for m in models:
-            metric, metric_label, _ = get_task_metric(st.session_state.task_type)
-            score = m['metrics'].get(metric, 0)
-            with st.expander(f"{m['name']} ({metric_label}: {score:.4f})"):
-                st.json(m['metrics'])
-                if 'model' in m['artifacts'] and os.path.exists(m['artifacts']['model']):
-                    with open(m['artifacts']['model'], 'rb') as f:
-                        st.download_button("Download Model", f.read(), file_name=os.path.basename(m['artifacts']['model']), key=f"dl_{m['name']}")
+        st.success(f"Found {len(models)} model(s).")
+        st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
+        
+        # Model Selection Section
+        st.markdown("### Choose Model to Manage")
+        model_options = [f"{m['name']} - {m['metrics'].get('accuracy', 0):.4f}" for m in models]
+        selected_idx = st.selectbox("Select a model:", range(len(models)), 
+                                     format_func=lambda i: model_options[i], key="model_select")
+        
+        selected_model = models[selected_idx]
+        metric, metric_label, _ = get_task_metric(st.session_state.task_type)
+        score = selected_model['metrics'].get(metric, 0)
+        
+        st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
+        
+        # Model Details
+        st.markdown("### Model Details")
+        col1, col2 = st.columns(2)
+        with col1:
+            st.metric("Current Name", selected_model['name'])
+            st.metric(metric_label, f"{score:.4f}")
+        with col2:
+            st.metric("Timestamp", selected_model['timestamp'])
+            st.metric("Metrics Count", len(selected_model['metrics']))
+        
+        # Display all metrics
+        with st.expander("View All Metrics"):
+            st.json(selected_model['metrics'])
+        
+        st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
+        
+        # Rename Section
+        st.markdown("### Rename Model")
+        new_name = st.text_input(
+            "New model name:",
+            value=selected_model['name'],
+            placeholder="Enter new model name",
+            key=f"rename_input_{selected_idx}"
+        )
+        
+        col_rename1, col_rename2 = st.columns(2)
+        with col_rename1:
+            if st.button("Save New Name", type="primary", key=f"rename_btn_{selected_idx}"):
+                if new_name and new_name != selected_model['name']:
+                    success = st.session_state.model_manager.rename_model(
+                        selected_model['model_name'], 
+                        new_name
+                    )
+                    if success:
+                        st.success(f"Model renamed to: {new_name}")
+                        st.rerun()
+                    else:
+                        st.error("Failed to rename model")
+                else:
+                    st.warning("Enter a different name")
+        
+        st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
+        
+        # Download Section
+        st.markdown("### Download Model")
+        if 'model' in selected_model['artifacts'] and os.path.exists(selected_model['artifacts']['model']):
+            with open(selected_model['artifacts']['model'], 'rb') as f:
+                st.download_button(
+                    "Download Model File",
+                    f.read(),
+                    file_name=os.path.basename(selected_model['artifacts']['model']),
+                    key=f"dl_{selected_model['model_name']}"
+                )
+        
+        # Code Section
+        if 'code' in selected_model['artifacts'] and os.path.exists(selected_model['artifacts']['code']):
+            with st.expander("View Model Code"):
+                with open(selected_model['artifacts']['code'], 'r', encoding='utf-8') as f:
+                    st.code(f.read(), language="python")
+        
+        st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
+        
+        # All Models Overview
+        st.markdown("### All Saved Models")
+        models_df = pd.DataFrame([
+            {
+                'Name': m['name'],
+                metric_label: f"{m['metrics'].get(metric, 0):.4f}",
+                'Timestamp': m['timestamp']
+            }
+            for m in models
+        ])
+        st.dataframe(models_df, use_container_width=True)
 
 def render_progress_tab():
     experiments = st.session_state.experiment_tracker.experiments
@@ -592,8 +715,11 @@ def render_progress_tab():
         st.info("Run experiments to see training progress here.")
         return
     
+    st.markdown("### Training Progress")
     fig = create_training_progress_chart(experiments, st.session_state.task_type)
     st.plotly_chart(fig, use_container_width=True, key="progress_chart_tab")
+    
+    st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
     
     successful = [e for e in experiments if e.get('success', False)]
     if successful:
@@ -609,6 +735,7 @@ def render_progress_tab():
             first_score = scores[0]
             improvement = first_score - best_score
         
+        st.markdown("### Statistics")
         col1, col2, col3, col4 = st.columns(4)
         with col1:
             st.metric("Total Iterations", len(experiments))
@@ -618,6 +745,73 @@ def render_progress_tab():
             st.metric(f"Best {metric_label}", f"{best_score:.4f}")
         with col4:
             st.metric("Improvement", f"{improvement:.4f}")
+        
+        st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
+        
+        # Model Selection and Saving Section
+        st.markdown("### Save Model to Artifacts")
+        
+        # Create options for each successful experiment
+        exp_options = []
+        for exp in successful:
+            iter_num = exp['iteration']
+            iter_score = exp['metrics'].get(metric, 0)
+            exp_options.append(f"Iteration {iter_num} — {metric_label}: {iter_score:.4f}")
+        
+        selected_exp_idx = st.selectbox(
+            "Choose experiment to save:",
+            range(len(successful)),
+            format_func=lambda i: exp_options[i],
+            key="save_model_select"
+        )
+        
+        selected_exp = successful[selected_exp_idx]
+        selected_score = selected_exp['metrics'].get(metric, 0)
+        
+        st.markdown("#### Selected Experiment Details")
+        col_detail1, col_detail2 = st.columns(2)
+        with col_detail1:
+            st.metric("Iteration", selected_exp['iteration'])
+            st.metric("Score", f"{selected_score:.4f}")
+        with col_detail2:
+            st.metric("Execution Time", f"{selected_exp.get('execution_time', 0):.1f}s")
+            st.metric("Status", "✓ Success" if selected_exp['success'] else "✗ Failed")
+        
+        # Model Name Input
+        st.markdown("#### Name Your Model")
+        default_name = f"Model_Iter{selected_exp['iteration']}"
+        model_name = st.text_input(
+            "Model name:",
+            value=default_name,
+            placeholder="Enter a descriptive name for your model",
+            key=f"model_name_input_{selected_exp_idx}"
+        )
+        
+        # Save Button
+        if st.button("Save Model to Artifacts", type="primary", key=f"save_model_btn_{selected_exp_idx}"):
+            if not model_name:
+                st.error("Please enter a model name")
+            else:
+                try:
+                    with st.spinner(f"Saving model '{model_name}'..."):
+                        # Get the model code from the experiment
+                        exp_code = selected_exp.get('code', '# No code available')
+                        
+                        # Save to model manager
+                        st.session_state.model_manager.save_model(
+                            model={"iteration": selected_exp['iteration'], "metrics": selected_exp['metrics']},
+                            name=model_name,
+                            metrics=selected_exp['metrics'],
+                            metadata={
+                                "iteration": selected_exp['iteration'],
+                                "task_type": st.session_state.task_type
+                            },
+                            code=exp_code
+                        )
+                        st.success(f"✓ Model '{model_name}' saved to Artifacts!")
+                        st.balloons()
+                except Exception as e:
+                    st.error(f"Failed to save model: {str(e)}")
 
 def run_auto_ml_loop(num_iterations: int):
     progress_bar = st.progress(0)

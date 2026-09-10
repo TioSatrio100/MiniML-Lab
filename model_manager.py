@@ -93,6 +93,32 @@ class ModelManager:
     def get_best_model(self) -> Optional[Dict[str, Any]]:
         if not self.models: return None
         return max(self.list_models(), key=lambda x: x['metrics'].get('accuracy', 0))
+    
+    def rename_model(self, old_model_name: str, new_name: str) -> bool:
+        """Rename a saved model"""
+        if old_model_name not in self.models:
+            logger.error(f"Model not found: {old_model_name}")
+            return False
+        
+        try:
+            model_info = self.models[old_model_name]
+            model_info['name'] = new_name
+            
+            # Update metadata file if it exists
+            if 'metadata' in model_info['artifacts']:
+                metadata_path = model_info['artifacts']['metadata']
+                if os.path.exists(metadata_path):
+                    with open(metadata_path, 'r', encoding='utf-8') as f:
+                        metadata_dict = json.load(f)
+                    metadata_dict['name'] = new_name
+                    with open(metadata_path, 'w', encoding='utf-8') as f:
+                        json.dump(metadata_dict, f, indent=2, ensure_ascii=False)
+            
+            logger.info(f"Model renamed from {old_model_name} to {new_name}")
+            return True
+        except Exception as e:
+            logger.error(f"Error renaming model: {str(e)}")
+            return False
 
 class ExperimentTracker:
     def __init__(self):
