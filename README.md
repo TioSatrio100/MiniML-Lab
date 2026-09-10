@@ -14,7 +14,8 @@ An intelligent ML automation framework powered by LLM agents. Generate, execute,
 - **LLM Code Generation** — Uses SumoPod AI (OpenAI-compatible API) to generate Python training scripts
 - **Self-Correcting Loops** — Analyzes failures and automatically improves code
 - **Iterative Learning** — Learns from previous experiments to beat the best score
-- **Any Model** — Type any model name (gpt-4o-mini, gpt-4o, claude-3-sonnet, etc.)
+- **Flexible Model Selection** — Choose from presets (gpt-4o-mini, gpt-4o, Claude, etc.) or enter any custom model name
+- **Model Management** — Save experiments with custom names, rename, and download from Artifacts
 
 ### Data Pipeline
 - **Synthetic Data** — Generate classification/regression datasets on-demand (sklearn)
@@ -27,6 +28,7 @@ An intelligent ML automation framework powered by LLM agents. Generate, execute,
 - **Live Updates** — Graph refreshes after each iteration completes
 - **Best Point Highlight** — Star marker on the best iteration
 - **Summary Stats** — Total iterations, successful count, best score, improvement
+- **Model Selection & Saving** — Choose any experiment from Progress tab, rename it, and save to Artifacts
 
 ### Design System
 - Off-white/cream background with dot-matrix pattern
@@ -63,14 +65,14 @@ Dashboard opens at `http://localhost:8501`
 
 Configure everything from the sidebar:
 
-| Setting | Description | Default |
+| Setting | Description | Options |
 |---------|-------------|---------|
 | API Key | Your SumoPod AI API key | — |
 | Base URL | API endpoint | `https://ai.sumopod.com/v1` |
-| Model | Any model name | `gpt-4o-mini` |
-| Task Type | classification, regression, clustering, recommendation | classification |
-| Data Source | Synthetic, AI-Generated, Upload CSV | Synthetic |
-| Max Iterations | Number of Auto-ML iterations | 3 |
+| **Model Selection** | Choose LLM model (Presets or Custom) | **Presets**: gpt-4o-mini, gpt-4o, gpt-4-turbo, Claude models; **Custom**: Enter any model name |
+| Task Type | ML task type | classification, regression, clustering, recommendation |
+| Data Source | Data input method | Synthetic, AI-Generated, Upload CSV |
+| Max Iterations | Number of Auto-ML iterations | 1-10 |
 
 ### Data Source Restrictions
 
@@ -85,8 +87,12 @@ Clustering and Recommendation require AI-generated data because they need specif
 
 ## Usage Guide
 
-### 1. Configure API
-Enter your SumoPod AI API key, base URL, and model name in the sidebar.
+### 1. Configure API & Model
+- Enter your SumoPod AI API key and base URL in the sidebar
+- **Select LLM Model**: 
+  - Click **Presets tab** for quick selection (gpt-4o-mini, gpt-4o, Claude, etc.)
+  - Or click **Custom tab** to enter any model name
+  - Confirmation badge shows current model
 
 ### 2. Select Task Type
 Choose from classification, regression, clustering, or recommendation.
@@ -97,21 +103,35 @@ Choose from classification, regression, clustering, or recommendation.
 - **CSV Upload**: Upload a file and click "Load CSV Data"
 
 ### 4. Run Auto-ML
-Click "Initialize Agent", then "Start Auto-ML Loop". The agent will:
-1. Analyze your data
-2. Generate training code
-3. Execute in a sandboxed subprocess
-4. Evaluate metrics
-5. Save only if it beats the previous best
-6. Repeat, learning from each iteration
+- Go to "Run Auto-ML" tab
+- See configuration display (Task Type, LLM Model, Max Iterations)
+- Click "Initialize Agent" (uses your selected model)
+- Click "Start Auto-ML Loop". The agent will:
+  1. Analyze your data
+  2. Generate training code using the selected LLM model
+  3. Execute in a sandboxed subprocess
+  4. Evaluate metrics
+  5. Save only if it beats the previous best
+  6. Repeat, learning from each iteration
 
-### 5. Monitor Progress
-Switch to the **Progress** tab to see:
-- Real-time metric chart with color-coded iterations
-- Summary cards: total iterations, successful, best score, improvement
+### 5. Monitor Progress & Save Models
+Switch to the **Progress** tab to:
+- View real-time metric chart with color-coded iterations
+- See summary cards: total iterations, successful, best score, improvement
+- **Save Model Section**:
+  1. Select an experiment from the dropdown
+  2. Enter a custom name for the model
+  3. Click "Save Model to Artifacts"
+  4. Saved with metadata, metrics, and code
 
-### 6. Download Artifacts
-In the **Artifacts** tab, download the best model (.pkl), view metrics, and inspect training code.
+### 6. Manage Artifacts
+In the **Artifacts** tab:
+- Select a saved model from the dropdown
+- View all metrics and details
+- Rename the model
+- Download the model file (.pkl)
+- View the training code that generated it
+- See all saved models in the overview table
 
 ## Architecture
 
