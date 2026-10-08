@@ -1,0 +1,14 @@
+fastapi
+uvicorn[standard]
+python-multipart
+httpx
+scikit-learn
+pandas
+numpy
+python-dotenv
+openai
+pydantic
+plotly
+langchain
+langchain-openai
+langgraph

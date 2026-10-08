@@ -1,0 +1,27 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./storage:/app/storage
+    environment:
+      # subprocess: works everywhere (ML deps baked into image).
+      # docker: needs docker CLI in image + socket mount — Linux host only (SETUP.md).
+      SANDBOX: ${SANDBOX:-subprocess}
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
+
+  # image-only service (profile "tools") — builds the sandbox image, never runs
+  sandbox-image:
+    build: ./backend/sandbox
+    image: miniml-sandbox:latest
+    profiles: ["tools"]
+    command: ["sleep", "1"]

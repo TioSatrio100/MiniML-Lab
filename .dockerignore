@@ -1,0 +1,16 @@
+__pycache__/
+*.pyc
+.git
+.gitignore
+venv/
+env/
+node_modules/
+frontend/dist/
+frontend/vite.log
+storage/
+models/
+fonts/
+agents_artifacts/
+tests/
+*.md
+.env

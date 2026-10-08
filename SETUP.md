@@ -1,358 +1,216 @@
-# Setup Guide - MiniML Lab
+# Setup Guide — MiniML Lab
 
-Complete step-by-step guide to get MiniML Lab up and running.
+Step-by-step installation and first run.
 
 ## System Requirements
 
-- **Python**: 3.8 or higher
+- **Python** 3.10+
+- **Node.js** 18+ (tested with 22)
+- **Docker** (optional — sandbox falls back to subprocess mode)
+- **RAM**: 4 GB minimum (8 GB recommended)
 - **OS**: Windows, macOS, or Linux
-- **RAM**: 4GB minimum (8GB recommended)
-- **Disk Space**: 500MB for dependencies
 
-## Installation Steps
+## Step 1: Get an LLM API Key
 
-### Step 1: Get OpenRouter API Key
+1. Visit a provider — e.g. https://ai.sumopod.com (or OpenRouter / OpenAI / any OpenAI-compatible endpoint)
+2. Create an API key
+3. Copy it — you'll paste it into the app sidebar later (stored server-side only)
 
-1. Visit https://openrouter.ai
-2. Sign up for free account
-3. Go to API Keys section
-4. Create new API key
-5. Copy and save the key
-
-### Step 2: Clone/Download Project
+## Step 2: Clone & Enter Project
 
 ```bash
-# Option A: Clone from Git (if available)
 git clone https://github.com/username/MiniML-Lab.git
 cd MiniML-Lab
-
-# Option B: Download files manually
-# Download all Python files into a directory
-# mkdir MiniML-Lab && cd MiniML-Lab
 ```
 
-### Step 3: Create Virtual Environment
+## Step 3: Backend Setup
 
 ```bash
-# Create virtual environment
 python -m venv venv
 
-# Activate it
-# On Windows:
-venv\Scripts\activate
+# activate
+venv\Scripts\activate           # Windows
+source venv/bin/activate        # macOS/Linux
 
-# On macOS/Linux:
-source venv/bin/activate
+pip install -r backend/requirements.txt
 ```
 
-### Step 4: Install Dependencies
+Start the API:
 
 ```bash
-pip install -r requirements.txt
+uvicorn backend.app:app --reload --port 8000
 ```
 
-Expected output:
-```
-Successfully installed aiohttp-3.9.1 numpy-1.24.3 pandas-2.1.3 ...
-```
+> Always run from the project root so `backend.*` imports and `storage/` paths resolve.
 
-### Step 5: Configure Environment
+## Step 4: Frontend Setup
+
+New terminal:
 
 ```bash
-# Copy example config
-cp .env.example .env
-
-# Edit .env file with your editor
-# Windows: notepad .env
-# macOS/Linux: nano .env
+cd frontend
+npm install
+npm run dev
 ```
 
-Add your API key:
-```env
-OPENROUTER_API_KEY=sk-or-xxxxx...
-```
+## Step 5: Open the App
 
-### Step 6: Run Application
+- Frontend: **http://localhost:5173**
+- Backend API docs: **http://localhost:8000/docs**
+- Health check: `curl http://localhost:8000/api/health`
 
-```bash
-streamlit run app.py
-```
-
-Application will open automatically at `http://localhost:8501`
+The Vite dev server proxies `/api/*` to `localhost:8000` — no CORS config needed in dev.
 
 ## Verification Checklist
 
-- [ ] Python version >= 3.8: `python --version`
-- [ ] Virtual environment activated: `(venv)` in terminal
-- [ ] All dependencies installed: `pip list | grep streamlit`
-- [ ] .env file configured with API key
-- [ ] Port 8501 is available
-- [ ] No firewall blocking localhost
-
-## Troubleshooting Installation
-
-### Python Not Found
-```bash
-# Ensure Python is in PATH
-python --version
-
-# If not found, reinstall Python from python.org
-# Make sure to check "Add Python to PATH"
-```
-
-### Virtual Environment Issues
-```bash
-# Delete and recreate venv
-rm -r venv  # Linux/macOS
-rmdir /s venv  # Windows
-
-python -m venv venv
-source venv/bin/activate  # or venv\Scripts\activate
-```
-
-### Dependency Conflicts
-```bash
-# Update pip first
-pip install --upgrade pip
-
-# Clear cache and reinstall
-pip install --no-cache-dir -r requirements.txt
-```
-
-### Port Already in Use
-```bash
-# Use different port
-streamlit run app.py --server.port 8502
-
-# Or find and kill process using port 8501
-# macOS/Linux:
-lsof -i :8501
-kill -9 <PID>
-
-# Windows:
-netstat -ano | findstr :8501
-taskkill /PID <PID> /F
-```
-
-## Docker Setup (Optional)
-
-### Dockerfile
-
-```dockerfile
-FROM python:3.10-slim
-
-WORKDIR /app
-
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-COPY . .
-
-EXPOSE 8501
-
-CMD ["streamlit", "run", "app.py", "--server.headless", "true"]
-```
-
-### Build and Run
-
-```bash
-# Build image
-docker build -t miniml-lab .
-
-# Run container
-docker run -p 8501:8501 \
-  -e OPENROUTER_API_KEY=your_key \
-  miniml-lab
-```
+- [ ] `python --version` ≥ 3.10
+- [ ] `pip show fastapi` resolves
+- [ ] `curl http://localhost:8000/api/health` → `{"status":"ok", ...}`
+- [ ] `node --version` ≥ 18
+- [ ] http://localhost:5173 renders "MiniML Lab" with sidebar
+- [ ] Sidebar provider list loads (SumoPod, OpenRouter, OpenAI, Ollama)
+- [ ] (Optional) `docker info` succeeds — else set `SANDBOX=subprocess`
 
 ## First-Time Usage
 
-### Initial Setup (5 minutes)
+1. **Sidebar → API key**: select provider, paste key, click **Save** (`✓ saved` appears)
+2. **Sandbox tab → Synthetic data**: pick task, click **Generate** — preview table appears
+3. **Sidebar**: set task type + max iterations
+4. Click **Run Auto-ML Loop** — trace streams in the Benchmark tab
+5. When done: best score/model in the Hero card; model code in My Models tab
 
-1. **Launch App**
-   - Run `streamlit run app.py`
-   - Open browser to http://localhost:8501
+## Sandbox Modes
 
-2. **Enter API Key**
-   - Paste OpenRouter API key in sidebar
-   - Click "API Settings" to expand
-
-3. **Generate Test Data**
-   - Select "Synthetic Data" in Data Settings
-   - Choose "classification" task
-   - Click "Generate Synthetic Data"
-
-4. **Initialize Agent**
-   - Click "Initialize Agent" button
-   - Wait for confirmation
-
-5. **Run Experiment**
-   - Go to Experimentation tab
-   - Click "Run Single Iteration"
-   - Monitor progress
-
-6. **View Results**
-   - Check Results tab for metrics
-   - Download model in Model Artifacts tab
-
-## Development Setup
-
-For contributing or extending:
+| Mode | How | Isolation |
+|------|-----|-----------|
+| `docker` (default) | runs `miniml-sandbox` image | no network, 512 MB, 1 CPU, temp mount |
+| `subprocess` | host Python | env allowlist only |
 
 ```bash
-# Install additional dev dependencies
-pip install pytest black flake8 mypy
+# force subprocess (no Docker needed)
+set SANDBOX=subprocess       # Windows
+export SANDBOX=subprocess    # macOS/Linux
 
-# Run tests
-pytest tests/
-
-# Format code
-black *.py
-
-# Type checking
-mypy *.py
+# pre-build the sandbox image (otherwise built on first run)
+docker build -t miniml-sandbox:latest backend/sandbox
 ```
 
-## File Structure After Setup
+## Ports
 
-```
-MiniML-Lab/
-├── venv/                    # Virtual environment (auto-created)
-├── app.py                   # Main application
-├── llm_agent.py            # Agent implementation
-├── data_pipeline.py        # Data processing
-├── model_manager.py        # Model management
-├── requirements.txt        # Dependencies
-├── .env                    # Configuration (KEEP SECRET!)
-├── .env.example            # Config template
-└── README.md               # Documentation
-```
-
-## Running on Different Machines
-
-### Windows
-```batch
-cd path\to\MiniML-Lab
-venv\Scripts\activate
-streamlit run app.py
-```
-
-### macOS
-```bash
-cd path/to/MiniML-Lab
-source venv/bin/activate
-streamlit run app.py
-```
-
-### Linux (Ubuntu/Debian)
-```bash
-cd path/to/MiniML-Lab
-source venv/bin/activate
-streamlit run app.py
-```
-
-## Headless Mode (Server)
-
-For running on remote server without GUI:
+| Service | Port | Override |
+|---------|------|----------|
+| FastAPI | 8000 | `uvicorn --port 8001` (+ update proxy in `frontend/vite.config.ts`) |
+| Vite dev | 5173 | `npm run dev -- --port 5174` |
 
 ```bash
-streamlit run app.py \
-  --server.headless true \
-  --server.port 8501 \
-  --logger.level=warning
+# Windows: find/kill port
+netstat -ano | findstr :8000
+taskkill /PID <PID> /F
+
+# macOS/Linux
+lsof -i :8000
+kill -9 <PID>
 ```
 
-Then access at: `http://server-ip:8501`
+## Docker Compose (production-style run)
 
-## Performance Optimization
-
-### For Slower Machines
-
-1. **Reduce data size**
-   - Lower n_samples in Data Settings
-   - Use fewer features
-
-2. **Use faster model**
-   - Switch to faster LLM (Llama 2 instead of GPT-4)
-   - Reduce max_tokens in config
-
-3. **Adjust timeouts**
-   - Increase MAX_EXECUTION_TIME in .env
-   - Lower MAX_RETRIES
-
-### For Better Performance
-
-1. **Use GPU** (optional)
-   - Install PyTorch with CUDA support
-   - Models will use GPU automatically
-
-2. **Increase resources**
-   - Add more RAM
-   - Use SSD for faster I/O
-
-## Health Check
-
-Verify installation with simple test:
-
-```python
-# test_install.py
-import streamlit as st
-import pandas as pd
-from sklearn.ensemble import RandomForestClassifier
-import numpy as np
-
-print("✅ Streamlit:", st.__version__)
-print("✅ Pandas:", pd.__version__)
-print("✅ Scikit-learn available")
-print("✅ All dependencies working!")
-```
-
-Run it:
 ```bash
-python test_install.py
+# backend :8000 + frontend :8080 (nginx, SSE-safe proxy)
+docker compose up --build
+
+# also build the sandbox image
+docker compose --profile tools build
+
+# open http://localhost:8080
 ```
 
-## Next Steps
+Notes:
+- Backend defaults to `SANDBOX=subprocess` in the container (ML deps are baked into the image) — works everywhere.
+- Docker-mode sandbox inside a container needs docker CLI + socket mount + identical host/container tmp paths — **Linux host only**. Add to `backend` service:
+  ```yaml
+  volumes:
+    - /var/run/docker.sock:/var/run/docker.sock
+  environment:
+    SANDBOX: docker
+  ```
+  (and install the docker CLI in `backend/Dockerfile` — comment in the file shows the one-liner)
+- Data persists in `./storage` (bind-mounted).
 
-1. **Read README.md** for feature overview
-2. **Try example workflows** in documentation
-3. **Configure your API key** properly
-4. **Start with synthetic data** for testing
-5. **Experiment with your data** once comfortable
+## Runtime Files
 
-## Getting Help
+```
+storage/
+├── sessions/{id}.csv     # uploaded/generated datasets
+├── sessions/{id}.json    # session config
+├── providers.json        # custom providers + API keys (SECRET — gitignored)
+├── models.json           # saved model registry
+└── experiments.json      # experiment tracker
+```
 
-- Check troubleshooting in README.md
-- Review error messages in console
-- Check OpenRouter status: https://status.openrouter.ai
-- Verify internet connection for API calls
+Never commit `storage/providers.json` or `.env`.
 
-## Security Notes
+## Troubleshooting Installation
 
-- ⚠️ Never commit .env file to Git
-- ⚠️ Keep API key secret
-- ⚠️ Use limited API scope if possible
-- ⚠️ Monitor API usage and costs
+### `ModuleNotFoundError: No module named 'backend'`
+Run uvicorn from project root: `uvicorn backend.app:app --port 8000`
+
+### `ModuleNotFoundError: No module named 'fastapi'`
+```bash
+pip install -r backend/requirements.txt
+```
+
+### Docker: "failed to connect to the docker API"
+Start Docker Desktop, or run with `SANDBOX=subprocess`.
+
+### `npm` errors / weird UI state
+```bash
+cd frontend
+rm -rf node_modules package-lock.json
+npm install
+```
+
+### Port already in use
+See Ports table above.
+
+### Python on PATH issues (Windows)
+```bash
+py --version
+py -m venv venv
+```
+Reinstall from python.org with "Add to PATH" checked if needed.
+
+## Development
+
+```bash
+# backend: auto-reload
+uvicorn backend.app:app --reload --port 8000
+
+# frontend: dev server with HMR
+cd frontend && npm run dev
+
+# frontend: lint + typecheck + build
+cd frontend
+npm run lint
+npm run build          # tsc -b && vite build
+
+# sandbox test script (docker or subprocess)
+python backend/tests/test_sandbox.py
+```
 
 ## Uninstallation
 
-To remove completely:
-
 ```bash
-# Deactivate environment
+# backend
 deactivate
+# Windows: rmdir /s /q venv    |    macOS/Linux: rm -rf venv
 
-# Remove venv
-rm -r venv  # or rmdir /s venv on Windows
+# frontend
+rm -rf frontend/node_modules frontend/dist
 
-# Delete project folder
-rm -r MiniML-Lab
+# runtime data
+rm -rf storage
 ```
 
 ---
 
-**Installation Complete!** 🎉
-
-You're ready to start experimenting with autonomous ML models.
-
-Questions? Check the README.md or troubleshooting section above.
+Questions? See README.md for architecture and API overview.
