@@ -1,6 +1,10 @@
 # MiniML Lab — Autonomous ML Experimentation Platform
 
-LLM agent that generates, executes, and improves ML experiments on its own. Full-stack: FastAPI backend + React frontend + sandboxed code execution.
+MiniML Lab is an **AI agent platform** that runs the full machine-learning workflow for you: describe your data, and the agent plans the approach, generates training code, executes it in a secure sandbox, reads the metrics, and iterates on its own mistakes until it finds the best model — then packages it as a downloadable artifact.
+
+**Who it's for:** students and researchers who want to prototype ML models without writing boilerplate, developers who want a hands-off baseline model in minutes, and anyone learning how agentic AI can drive real data-science workflows end to end.
+
+**Under the hood:** a FastAPI backend orchestrating a LangChain tool-calling agent, a React frontend with live streaming progress, sandboxed code execution (Docker or hardened subprocess), and multi-provider LLM support (SumoPod, OpenRouter, OpenAI, Ollama, or any OpenAI-compatible endpoint).
 
 ## Features
 
