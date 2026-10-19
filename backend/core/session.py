@@ -42,13 +42,17 @@ class Session:
     target: Optional[str] = None
     preprocessor: DataPreprocessor = field(default_factory=DataPreprocessor)
     model_manager: ModelManager = field(default_factory=ModelManager)
-    tracker: ExperimentTracker = field(default_factory=ExperimentTracker)
+    tracker: ExperimentTracker = None  # type: ignore[assignment]  (initialized in __post_init__)
     best_score: float = 0.0
     best_model_name: str = "None"
     agent_trace: List[str] = field(default_factory=list)
     iteration_results: List[Dict[str, Any]] = field(default_factory=list)
     agent_summary: str = ""
     agent_running: bool = False
+
+    def __post_init__(self):
+        if self.tracker is None:
+            self.tracker = ExperimentTracker(session_id=self.session_id)
 
     @property
     def data_path(self) -> str:
@@ -95,10 +99,27 @@ def get_session(session_id: str) -> Session:
     return session
 
 
+UNSUPPORTED_SYNTHETIC_TASKS = ("clustering", "recommendation")
+
+
+class ConfigValidationError(ValueError):
+    pass
+
+
 def update_config(session: Session, patch: Dict[str, Any]) -> Dict[str, Any]:
+    previous = {k: session.config[k] for k in DEFAULT_CONFIG if k in patch}
     for key in DEFAULT_CONFIG:
         if key in patch:
             session.config[key] = patch[key]
+    if ("task_type" in patch or "data_source" in patch) and (
+        session.config["task_type"] in UNSUPPORTED_SYNTHETIC_TASKS
+        and session.config["data_source"] == "synthetic"
+    ):
+        session.config.update(previous)
+        raise ConfigValidationError(
+            f"task_type '{session.config['task_type']}' requires uploaded or AI-generated data — "
+            "synthetic datasets only support classification/regression"
+        )
     _persist_config(session)
     return session.config
 

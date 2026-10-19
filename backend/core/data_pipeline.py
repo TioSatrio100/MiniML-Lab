@@ -54,11 +54,14 @@ class DataPreprocessor:
         
         if task == "classification":
             from sklearn.datasets import make_classification
+            # Clamp so small n_features stay valid: need 2**n_informative >= n_classes*n_clusters
+            n_informative = max(2, n_features - 2)
+            n_redundant = max(0, min(1, n_features - n_informative))
             X, y = make_classification(
                 n_samples=n_samples,
                 n_features=n_features,
-                n_informative=n_features - 2,
-                n_redundant=1,
+                n_informative=n_informative,
+                n_redundant=n_redundant,
                 n_clusters_per_class=2,
                 random_state=random_state
             )
