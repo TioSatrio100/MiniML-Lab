@@ -1,39 +1,39 @@
-# MiniML Lab — Autonomous ML Experimentation Platform
+# MiniML Lab
 
-MiniML Lab is an **AI agent platform** that runs the full machine-learning workflow for you: describe your data, and the agent plans the approach, generates training code, executes it in a secure sandbox, reads the metrics, and iterates on its own mistakes until it finds the best model — then packages it as a downloadable artifact.
+MiniML Lab is an **AI agent platform** that runs the whole machine-learning workflow for you. Describe your data and the agent plans the approach, generates training code, executes it in a secure sandbox, reads the metrics, and keeps fixing its own mistakes until it finds the best model. Then it packages the model as a downloadable artifact.
 
 **Who it's for:** students and researchers who want to prototype ML models without writing boilerplate, developers who want a hands-off baseline model in minutes, and anyone learning how agentic AI can drive real data-science workflows end to end.
 
-**Under the hood:** a FastAPI backend orchestrating a LangChain tool-calling agent, a React frontend with live streaming progress, sandboxed code execution (Docker or hardened subprocess), and multi-provider LLM support (SumoPod, OpenRouter, OpenAI, Ollama, or any OpenAI-compatible endpoint).
+**Under the hood:** a FastAPI backend that orchestrates a LangChain tool-calling agent, a React frontend with live streaming progress, sandboxed code execution (Docker or hardened subprocess), and multi-provider LLM support (SumoPod, OpenRouter, OpenAI, Ollama, or any OpenAI-compatible endpoint).
 
 ## Features
 
 ### 4 Task Types
-- **Classification** — Accuracy, Precision, Recall, F1
-- **Regression** — R², RMSE, MAE
-- **Clustering** — Silhouette Score, Inertia (unsupervised)
-- **Recommendation** — Content-based, RMSE, Precision@K
+- **Classification**: Accuracy, Precision, Recall, F1
+- **Regression**: R², RMSE, MAE
+- **Clustering**: Silhouette Score, Inertia (unsupervised)
+- **Recommendation**: Content-based, RMSE, Precision@K
 
 ### AI-Powered Agent
-- **LangChain Tool-Calling Agent** — decides its own workflow via tools (`analyze_dataset`, `run_experiment`, `get_history`, `save_model`, `finish`)
-- **Multi-Provider Support** — SumoPod, OpenRouter, OpenAI, Ollama, or any OpenAI-compatible endpoint (custom base_url + API key + model list)
-- **Self-Correcting Loops** — tool errors feed back to the agent; budget-gated iterations
-- **Real-Time Streaming** — agent trace, iterations, and results stream live over SSE
+- **LangChain Tool-Calling Agent**: decides its own workflow via tools (`analyze_dataset`, `run_experiment`, `get_history`, `save_model`, `finish`)
+- **Multi-Provider Support**: SumoPod, OpenRouter, OpenAI, Ollama, or any OpenAI-compatible endpoint (custom base_url + API key + model list)
+- **Self-Correcting Loops**: tool errors feed back to the agent; budget-gated iterations
+- **Real-Time Streaming**: agent trace, iterations, and results stream live over SSE
 
 ### Data Pipeline
-- **Synthetic Data** — generate classification/regression datasets on demand (sklearn)
-- **CSV Upload** — load your own dataset, target auto-detected
-- **Automated Preprocessing** — missing values, categorical encoding, feature scaling
+- **Synthetic Data**: generate classification/regression datasets on demand (sklearn)
+- **CSV Upload**: load your own dataset, target auto-detected
+- **Automated Preprocessing**: missing values, categorical encoding, feature scaling
 
 ### Sandboxed Execution
-- LLM-generated code runs isolated from the host:
-  - **Docker mode** (default): `--network none`, 512 MB RAM, 1 CPU, temp-dir mount only
-  - **Subprocess mode**: host Python with strict env allowlist (no secret leakage)
-- `SANDBOX=docker|subprocess`, auto-fallback when Docker daemon is unreachable
+LLM-generated code runs isolated from the host:
+- **Docker mode** (default): `--network none`, 512 MB RAM, 1 CPU, temp-dir mount only
+- **Subprocess mode**: host Python with strict env allowlist (no secret leakage)
+- Set with `SANDBOX=docker|subprocess`, auto-fallback when Docker daemon is unreachable
 
 ### Design System
 - Off-white/cream background with dot-matrix pattern
-- Inter for UI, JetBrains Mono for code/technical elements
+- Inter for UI, JetBrains Mono for code and technical elements
 - Terracotta/coral (`#e06c53`) accent, hairline borders, card layout
 
 ## Quick Start
@@ -41,7 +41,7 @@ MiniML Lab is an **AI agent platform** that runs the full machine-learning workf
 ### Prerequisites
 - Python 3.10+
 - Node.js 18+
-- Docker (optional — subprocess fallback works without it)
+- Docker (optional, subprocess fallback works without it)
 - An LLM API key (e.g. SumoPod: https://ai.sumopod.com)
 
 ### 1. Backend
@@ -66,7 +66,7 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:5173 — `/api` is proxied to the backend automatically.
+Open http://localhost:5173. The `/api` route is proxied to the backend automatically.
 
 ## Quick verify
 
@@ -84,11 +84,11 @@ cd frontend && npm run build
 
 ## Usage
 
-1. **Configure** (sidebar): pick provider + model, paste API key (stored server-side in `storage/providers.json`, never sent back to the browser), choose task type and max iterations.
-2. **Prepare data** (Sandbox tab): generate synthetic data or upload CSV; preview shows shape, dtypes, target.
-3. **Run** — "Run Auto-ML Loop": the agent analyzes the dataset, writes training code, executes it in the sandbox, evaluates metrics, and iterates until the budget is exhausted or it calls `finish`.
-4. **Monitor** (Benchmark tab): live trace, experiment stats (successful/total, best metric, improvement).
-5. **Save & inspect** (My Models tab): agent registers the best model via `save_model`; view metrics and the exact training code.
+1. **Configure** (sidebar): pick a provider and model, paste your API key (stored server-side in `storage/providers.json`, never sent back to the browser), choose the task type and max iterations.
+2. **Prepare data** (Sandbox tab): generate synthetic data or upload a CSV; the preview shows shape, dtypes, and target.
+3. **Run** with "Run Auto-ML Loop": the agent analyzes the dataset, writes training code, executes it in the sandbox, evaluates metrics, and iterates until the budget runs out or it calls `finish`.
+4. **Monitor** (Benchmark tab): live trace and experiment stats (successful/total, best metric, improvement).
+5. **Save and inspect** (My Models tab): the agent registers the best model via `save_model`; view metrics and the exact training code.
 
 ### Configuration
 
@@ -98,43 +98,43 @@ cd frontend && npm run build
 | API key | sidebar (Save) | server-side only, `has_key` flag returned to UI |
 | Model | sidebar | editable model list per provider |
 | Task type | sidebar / Sandbox tab | drives prompts + primary metric |
-| Max iterations | sidebar (1–10) | agent budget |
+| Max iterations | sidebar (1-10) | agent budget |
 
 ## Architecture
 
 ```
 Browser (React + zustand)
-   │  fetch + SSE
-   ▼
+    |  fetch + SSE
+    v
 FastAPI (backend/app.py)
-   ├── api/routes_*        REST: session, data, providers, models, progress, agent
-   ├── core/session.py     in-memory session state (replaces st.session_state)
-   ├── core/llm_agent.py   LangChain agent + tools
-   ├── core/model_manager  artifacts + experiment tracker (JSON-persisted)
-   ├── core/providers.py   provider registry → storage/providers.json
-   └── sandbox/            run_script(): docker | subprocess execution
+   |-- api/routes_*        REST: session, data, providers, models, progress, agent
+   |-- core/session.py     in-memory session state (replaces st.session_state)
+   |-- core/llm_agent.py   LangChain agent + tools
+   |-- core/model_manager  artifacts + experiment tracker (JSON-persisted)
+   |-- core/providers.py   provider registry -> storage/providers.json
+   `-- sandbox/            run_script(): docker | subprocess execution
 ```
 
 **Agent loop:**
 
 ```
-analyze_dataset → generate code → run_experiment (sandbox)
-      ↑                                    │
-      │         metrics / error ───────────┘
-      ├─ is_better → save_model
-      └─ budget exhausted → finish(summary)
+analyze_dataset -> generate code -> run_experiment (sandbox)
+      ^                                   |
+      |          metrics / error ---------+
+      |- is_better -> save_model
+      `- budget exhausted -> finish(summary)
 ```
 
-**Streaming:** `POST /api/session/{id}/agent/run` → job id; `GET /api/session/{id}/agent/stream/{job}` emits SSE events: `trace`, `iteration`, `error`, `done`.
+**Streaming:** `POST /api/session/{id}/agent/run` returns a job id; `GET /api/session/{id}/agent/stream/{job}` emits SSE events: `trace`, `iteration`, `error`, `done`.
 
 ### Task Metrics
 
 | Task | Primary Metric | Direction | Other |
 |------|---------------|-----------|-------|
-| Classification | Accuracy | ↑ better | Precision, Recall, F1 |
-| Regression | R² Score | ↑ better | RMSE, MAE |
-| Clustering | Silhouette | ↑ better | Inertia, N Clusters |
-| Recommendation | RMSE | ↓ better | MAE, Precision@K |
+| Classification | Accuracy | higher is better | Precision, Recall, F1 |
+| Regression | R² Score | higher is better | RMSE, MAE |
+| Clustering | Silhouette | higher is better | Inertia, N Clusters |
+| Recommendation | RMSE | lower is better | MAE, Precision@K |
 
 ## Project Structure
 
@@ -190,11 +190,11 @@ MiniML_Lab/
 
 ## Troubleshooting
 
-- **"No API key for provider"** — paste key in sidebar, click Save (stored in `storage/providers.json`).
-- **"Connection error" on run** — LLM endpoint unreachable; check base_url / key.
-- **Docker sandbox warnings** — start Docker Desktop or set `SANDBOX=subprocess`.
-- **Experiment timeout** — 120 s cap; reduce samples or pick a smaller model class.
-- **Port in use** — `uvicorn --port 8001` and update the Vite proxy in `frontend/vite.config.ts`.
+- **"No API key for provider"**: paste key in sidebar, click Save (stored in `storage/providers.json`).
+- **"Connection error" on run**: LLM endpoint unreachable; check base_url / key.
+- **Docker sandbox warnings**: start Docker Desktop or set `SANDBOX=subprocess`.
+- **Experiment timeout**: 120 s cap; reduce samples or pick a smaller model class.
+- **Port in use**: `uvicorn --port 8001` and update the Vite proxy in `frontend/vite.config.ts`.
 
 ## License
 

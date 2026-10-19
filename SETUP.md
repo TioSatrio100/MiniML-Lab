@@ -1,22 +1,22 @@
-# Setup Guide — MiniML Lab
+# Setup Guide
 
-Step-by-step installation and first run.
+Step-by-step installation and first run for MiniML Lab.
 
 ## System Requirements
 
 - **Python** 3.10+
 - **Node.js** 18+ (tested with 22)
-- **Docker** (optional — sandbox falls back to subprocess mode)
+- **Docker** (optional, sandbox falls back to subprocess mode)
 - **RAM**: 4 GB minimum (8 GB recommended)
 - **OS**: Windows, macOS, or Linux
 
 ## Step 1: Get an LLM API Key
 
-1. Visit a provider — e.g. https://ai.sumopod.com (or OpenRouter / OpenAI / any OpenAI-compatible endpoint)
+1. Visit a provider, e.g. https://ai.sumopod.com (or OpenRouter / OpenAI / any OpenAI-compatible endpoint)
 2. Create an API key
-3. Copy it — you'll paste it into the app sidebar later (stored server-side only)
+3. Copy it. You'll paste it into the app sidebar later (stored server-side only)
 
-## Step 2: Clone & Enter Project
+## Step 2: Clone and Enter Project
 
 ```bash
 git clone https://github.com/username/MiniML-Lab.git
@@ -41,7 +41,7 @@ Start the API:
 uvicorn backend.app:app --reload --port 8000
 ```
 
-> Always run from the project root so `backend.*` imports and `storage/` paths resolve.
+Note: always run from the project root so `backend.*` imports and `storage/` paths resolve.
 
 ## Step 4: Frontend Setup
 
@@ -59,25 +59,25 @@ npm run dev
 - Backend API docs: **http://localhost:8000/docs**
 - Health check: `curl http://localhost:8000/api/health`
 
-The Vite dev server proxies `/api/*` to `localhost:8000` — no CORS config needed in dev.
+The Vite dev server proxies `/api/*` to `localhost:8000`, so no CORS config is needed in dev.
 
 ## Verification Checklist
 
-- [ ] `python --version` ≥ 3.10
+- [ ] `python --version` >= 3.10
 - [ ] `pip show fastapi` resolves
-- [ ] `curl http://localhost:8000/api/health` → `{"status":"ok", ...}`
-- [ ] `node --version` ≥ 18
+- [ ] `curl http://localhost:8000/api/health` returns `{"status":"ok", ...}`
+- [ ] `node --version` >= 18
 - [ ] http://localhost:5173 renders "MiniML Lab" with sidebar
 - [ ] Sidebar provider list loads (SumoPod, OpenRouter, OpenAI, Ollama)
-- [ ] (Optional) `docker info` succeeds — else set `SANDBOX=subprocess`
+- [ ] (Optional) `docker info` succeeds, otherwise set `SANDBOX=subprocess`
 
 ## First-Time Usage
 
-1. **Sidebar → API key**: select provider, paste key, click **Save** (`✓ saved` appears)
-2. **Sandbox tab → Synthetic data**: pick task, click **Generate** — preview table appears
-3. **Sidebar**: set task type + max iterations
-4. Click **Run Auto-ML Loop** — trace streams in the Benchmark tab
-5. When done: best score/model in the Hero card; model code in My Models tab
+1. **Sidebar, API key**: select provider, paste key, click **Save** (a checkmark appears)
+2. **Sandbox tab, Synthetic data**: pick task, click **Generate**, preview table appears
+3. **Sidebar**: set task type and max iterations
+4. Click **Run Auto-ML Loop**. Trace streams in the Benchmark tab
+5. When done: best score and model in the Hero card; model code in My Models tab
 
 ## Sandbox Modes
 
@@ -125,26 +125,26 @@ docker compose --profile tools build
 ```
 
 Notes:
-- Backend defaults to `SANDBOX=subprocess` in the container (ML deps are baked into the image) — works everywhere.
-- Docker-mode sandbox inside a container needs docker CLI + socket mount + identical host/container tmp paths — **Linux host only**. Add to `backend` service:
+- Backend defaults to `SANDBOX=subprocess` in the container (ML deps are baked into the image), so it works everywhere.
+- Docker-mode sandbox inside a container needs docker CLI + socket mount + identical host/container tmp paths. Linux host only. Add to `backend` service:
   ```yaml
   volumes:
     - /var/run/docker.sock:/var/run/docker.sock
   environment:
     SANDBOX: docker
   ```
-  (and install the docker CLI in `backend/Dockerfile` — comment in the file shows the one-liner)
+  (and install the docker CLI in `backend/Dockerfile`; a comment in the file shows the one-liner)
 - Data persists in `./storage` (bind-mounted).
 
 ## Runtime Files
 
 ```
 storage/
-├── sessions/{id}.csv     # uploaded/generated datasets
-├── sessions/{id}.json    # session config
-├── providers.json        # custom providers + API keys (SECRET — gitignored)
-├── models.json           # saved model registry
-└── experiments.json      # experiment tracker
+|-- sessions/{id}.csv     # uploaded/generated datasets
+|-- sessions/{id}.json    # session config
+|-- providers.json        # custom providers + API keys (SECRET, gitignored)
+|-- models.json           # saved model registry
+`-- experiments.json      # experiment tracker
 ```
 
 Never commit `storage/providers.json` or `.env`.
@@ -210,7 +210,5 @@ rm -rf frontend/node_modules frontend/dist
 # runtime data
 rm -rf storage
 ```
-
----
 
 Questions? See README.md for architecture and API overview.
