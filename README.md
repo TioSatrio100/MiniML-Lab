@@ -64,6 +64,20 @@ npm run dev
 
 Open http://localhost:5173 — `/api` is proxied to the backend automatically.
 
+## Quick verify
+
+```bash
+# API up?
+curl http://localhost:8000/api/health          # {"status":"ok",...}
+
+# backend test suite
+pip install -r backend/requirements-dev.txt
+python -m pytest backend/tests -q              # 36 passed
+
+# frontend typecheck + build
+cd frontend && npm run build
+```
+
 ## Usage
 
 1. **Configure** (sidebar): pick provider + model, paste API key (stored server-side in `storage/providers.json`, never sent back to the browser), choose task type and max iterations.
