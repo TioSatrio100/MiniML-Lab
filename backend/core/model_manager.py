@@ -128,8 +128,9 @@ class ModelManager:
             return False
 
 class ExperimentTracker:
-    def __init__(self):
-        self.experiments: List[Dict[str, Any]] = storage.load_experiments()
+    def __init__(self, session_id: Optional[str] = None):
+        self.session_id = session_id
+        self.experiments: List[Dict[str, Any]] = storage.load_experiments(session_id)
 
     def log_experiment(self, iteration, code, execution_time, success, metrics=None, error=None, model_path=None):
         self.experiments.append({
@@ -142,7 +143,7 @@ class ExperimentTracker:
             'error': error,
             'model_path': model_path
         })
-        storage.save_experiments(self.experiments)
+        storage.save_experiments(self.experiments, self.session_id)
     
     def get_experiment_history(self): return self.experiments
     def get_successful_experiments(self): return [e for e in self.experiments if e['success']]
@@ -158,4 +159,4 @@ class ExperimentTracker:
         return f"Total: {total}, Success: {len(successful)}, Rate: {rate:.1f}%"
 
 def create_model_manager(artifacts_dir=None): return ModelManager(artifacts_dir)
-def create_experiment_tracker(): return ExperimentTracker()
+def create_experiment_tracker(session_id=None): return ExperimentTracker(session_id)

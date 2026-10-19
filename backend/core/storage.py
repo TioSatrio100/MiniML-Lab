@@ -5,7 +5,7 @@ import json
 import logging
 import os
 import threading
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -45,11 +45,20 @@ def save_models(models: Dict[str, Dict]) -> None:
         _write(MODELS_FILE, models)
 
 
-def load_experiments() -> List[Dict]:
+def load_experiments(session_id: Optional[str] = None) -> List[Dict]:
     with _lock:
-        return _read(EXPERIMENTS_FILE, [])
+        return _read(_experiments_path(session_id), [])
 
 
-def save_experiments(experiments: List[Dict]) -> None:
+def save_experiments(experiments: List[Dict], session_id: Optional[str] = None) -> None:
     with _lock:
-        _write(EXPERIMENTS_FILE, experiments)
+        path = _experiments_path(session_id)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        _write(path, experiments)
+
+
+def _experiments_path(session_id: Optional[str]) -> str:
+    """Per-session experiment history — prevents tracker bleed between sessions."""
+    if not session_id:
+        return EXPERIMENTS_FILE
+    return os.path.join(STORAGE_DIR, "experiments", f"{session_id}.json")
