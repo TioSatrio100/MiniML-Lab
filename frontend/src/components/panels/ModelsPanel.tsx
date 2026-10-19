@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
-import { Code2, Download } from 'lucide-react'
+import { Check, Code2, Download, Pencil, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
 import { api, type ModelInfo } from '@/lib/api'
 import { useStore } from '@/lib/store'
 
@@ -10,6 +11,8 @@ export default function ModelsPanel() {
   const [error, setError] = useState<string | null>(null)
   const [code, setCode] = useState<{ name: string; code: string } | null>(null)
   const [compare, setCompare] = useState<string[]>([])
+  const [renaming, setRenaming] = useState<string | null>(null)
+  const [renameValue, setRenameValue] = useState('')
   const modelsVersion = useStore((s) => s.modelsVersion)
 
   const refresh = () => api.models().then(setModels).catch((e) => setError(String(e.message ?? e)))
@@ -36,6 +39,23 @@ export default function ModelsPanel() {
     setCompare((prev) =>
       prev.includes(name) ? prev.filter((n) => n !== name) : prev.length >= 3 ? [...prev.slice(1), name] : [...prev, name],
     )
+  }
+
+  const startRename = (m: ModelInfo) => {
+    setRenaming(m.model_name)
+    setRenameValue(m.display_name || m.model_name)
+  }
+
+  const commitRename = async (model_name: string) => {
+    const value = renameValue.trim()
+    setRenaming(null)
+    if (!value) return
+    try {
+      await api.renameModel(model_name, value)
+      await refresh()
+    } catch (e) {
+      setError(String((e as Error).message ?? e))
+    }
   }
 
   return (
@@ -113,7 +133,48 @@ export default function ModelsPanel() {
                 className="accent-primary"
                 aria-label={`compare ${m.model_name}`}
               />
-              <CardTitle className="font-mono text-sm">{m.display_name || m.model_name}</CardTitle>
+              {renaming === m.model_name ? (
+                <form
+                  className="flex items-center gap-1"
+                  onSubmit={(e) => {
+                    e.preventDefault()
+                    void commitRename(m.model_name)
+                  }}
+                >
+                  <Input
+                    autoFocus
+                    value={renameValue}
+                    onChange={(e) => setRenameValue(e.target.value)}
+                    onBlur={() => commitRename(m.model_name)}
+                    onKeyDown={(e) => e.key === 'Escape' && setRenaming(null)}
+                    className="h-7 w-48 font-mono text-xs"
+                    aria-label="new model name"
+                  />
+                  <Button type="submit" variant="ghost" size="icon-sm" aria-label="confirm rename">
+                    <Check className="size-3.5" />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    onClick={() => setRenaming(null)}
+                    aria-label="cancel rename"
+                  >
+                    <X className="size-3.5" />
+                  </Button>
+                </form>
+              ) : (
+                <>
+                  <CardTitle className="font-mono text-sm">{m.display_name || m.model_name}</CardTitle>
+                  <button
+                    className="text-muted-foreground transition-colors hover:text-primary"
+                    onClick={() => startRename(m)}
+                    aria-label={`rename ${m.model_name}`}
+                  >
+                    <Pencil className="size-3" />
+                  </button>
+                </>
+              )}
             </div>
             <div className="flex gap-4 font-mono text-xs">
               <button
