@@ -150,6 +150,8 @@ def _run_agent(job: Job, session: session_store.Session) -> None:
             budget=cfg["max_iterations"],
             best_score=session.best_score,
             best_model_name=session.best_model_name,
+            provider=cfg["provider"],
+            model_name=cfg["model_name"],
         )
         agent = create_agent_with_tools(model, ctx)
 

@@ -77,22 +77,40 @@ def _ensure_image() -> bool:
         return False
 
 
-def run_script(script_path: str, work_dir: str, data_path: str, timeout: int = 120) -> subprocess.CompletedProcess:
+def run_script(
+    script_path: str,
+    work_dir: str,
+    data_path: Optional[str],
+    timeout: int = 120,
+    env_extra: Optional[dict] = None,
+) -> subprocess.CompletedProcess:
     """Run exp.py. Returns CompletedProcess with returncode/stdout/stderr.
-    Work dir must contain script_path. Model output stays in work_dir."""
+    Work dir must contain script_path. data_path=None scripts run without an input
+    dataset (generators write results to OUTPUT_PATH inside work_dir)."""
     if ENV_MODE == "docker" and _docker_available() and _ensure_image():
-        return _run_docker(script_path, work_dir, data_path, timeout)
-    return _run_subprocess(script_path, work_dir, data_path, timeout)
+        return _run_docker(script_path, work_dir, data_path, timeout, env_extra)
+    return _run_subprocess(script_path, work_dir, data_path, timeout, env_extra)
 
 
-def _run_docker(script_path: str, work_dir: str, data_path: str, timeout: int) -> subprocess.CompletedProcess:
-    # Copy dataset into mounted work dir — container reads /work/data.csv
-    local_data = os.path.join(work_dir, "data.csv")
-    if os.path.abspath(data_path) != os.path.abspath(local_data):
-        shutil.copy2(data_path, local_data)
+def _run_docker(
+    script_path: str,
+    work_dir: str,
+    data_path: Optional[str],
+    timeout: int,
+    env_extra: Optional[dict],
+) -> subprocess.CompletedProcess:
+    env_args = []
+    if data_path:
+        # Copy dataset into mounted work dir — container reads /work/data.csv
+        local_data = os.path.join(work_dir, "data.csv")
+        if os.path.abspath(data_path) != os.path.abspath(local_data):
+            shutil.copy2(data_path, local_data)
+        env_args += ["-e", "DATA_PATH=/work/data.csv"]
+    env_args += ["-e", "OUTPUT_PATH=/work/output.csv"]
+    for k, v in (env_extra or {}).items():
+        env_args += ["-e", f"{k}={v}"]
 
     mount = os.path.abspath(work_dir).replace("\\", "/")
-    container_data = "/work/data.csv"
     cmd = [
         "docker", "run", "--rm",
         "--network", "none",
@@ -100,7 +118,7 @@ def _run_docker(script_path: str, work_dir: str, data_path: str, timeout: int) -
         "--cpus", "1",
         "-v", f"{mount}:/work",
         "-w", "/work",
-        "-e", f"DATA_PATH={container_data}",
+        *env_args,
         IMAGE,
         "python", "/work/" + os.path.basename(script_path),
     ]
@@ -112,12 +130,22 @@ def _run_docker(script_path: str, work_dir: str, data_path: str, timeout: int) -
         return subprocess.CompletedProcess(cmd, returncode=124, stdout="", stderr="TIMEOUT")
 
 
-def _run_subprocess(script_path: str, work_dir: str, data_path: str, timeout: int) -> subprocess.CompletedProcess:
+def _run_subprocess(
+    script_path: str,
+    work_dir: str,
+    data_path: Optional[str],
+    timeout: int,
+    env_extra: Optional[dict],
+) -> subprocess.CompletedProcess:
+    extra = {"OUTPUT_PATH": os.path.join(work_dir, "output.csv")}
+    if data_path:
+        extra["DATA_PATH"] = data_path
+    extra.update(env_extra or {})
     return subprocess.run(
         [sys.executable, script_path],
         capture_output=True,
         text=True,
         timeout=timeout,
-        env=_filtered_env({"DATA_PATH": data_path}),
+        env=_filtered_env(extra),
         cwd=work_dir,
     )

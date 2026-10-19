@@ -9,6 +9,7 @@ from pydantic import BaseModel
 
 from backend.core import session as session_store
 from backend.core.data_pipeline import DataPreprocessor
+from backend.core.session import ConfigValidationError
 
 router = APIRouter(prefix="/api", tags=["session-data"])
 
@@ -32,6 +33,11 @@ class SyntheticRequest(BaseModel):
     n_features: int
 
 
+class AIDataRequest(BaseModel):
+    description: str
+    n_samples: Optional[int] = None
+
+
 def _get(session_id: str) -> session_store.Session:
     try:
         return session_store.get_session(session_id)
@@ -53,11 +59,19 @@ def get_config(session_id: str) -> Dict[str, Any]:
 @router.put("/session/{session_id}/config")
 def put_config(session_id: str, patch: ConfigPatch) -> Dict[str, Any]:
     session = _get(session_id)
-    return session_store.update_config(session, patch.model_dump(exclude_none=True))
+    try:
+        return session_store.update_config(session, patch.model_dump(exclude_none=True))
+    except ConfigValidationError as e:
+        raise HTTPException(400, str(e))
 
 
 @router.post("/session/{session_id}/data/synthetic")
 def generate_synthetic(session_id: str, body: SyntheticRequest) -> Dict[str, Any]:
+    if body.task_type in ("clustering", "recommendation"):
+        raise HTTPException(
+            400,
+            f"Synthetic data does not support {body.task_type} — upload a CSV or use AI-generated data",
+        )
     session = _get(session_id)
     prep = DataPreprocessor()
     try:
@@ -67,8 +81,57 @@ def generate_synthetic(session_id: str, body: SyntheticRequest) -> Dict[str, Any
     target = "target" if body.task_type in ("classification", "regression") else None
     session.preprocessor = prep
     session.set_dataset(df, target)
-    session_store.update_config(session, {"task_type": body.task_type})
+    session_store.update_config(session, {"task_type": body.task_type, "data_source": "synthetic"})
     return {"preview": session.preview()}
+
+
+@router.post("/session/{session_id}/data/ai")
+def generate_ai_data(session_id: str, body: AIDataRequest) -> Dict[str, Any]:
+    """LLM writes a dataset-builder script → sandbox executes → preview."""
+    session = _get(session_id)
+    cfg = session.config
+    if cfg["task_type"] in ("clustering", "recommendation", "classification", "regression"):
+        pass  # all task types allowed; hints adapt per task
+    else:
+        raise HTTPException(400, f"Unknown task_type: {cfg['task_type']}")
+    if not (body.description or "").strip():
+        raise HTTPException(400, "description required")
+
+    from backend.core.data_gen import generate_dataset
+
+    try:
+        result = generate_dataset(
+            description=body.description,
+            task_type=cfg["task_type"],
+            provider=cfg["provider"],
+            model_name=cfg["model_name"],
+            n_samples=body.n_samples or cfg["n_samples"] or 200,
+        )
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except Exception as e:
+        raise HTTPException(502, f"AI data generation failed: {e}")
+
+    df = result["df"]
+    target = "rating" if cfg["task_type"] == "recommendation" and "rating" in df.columns else None
+    if cfg["task_type"] in ("classification", "regression") and "target" in df.columns:
+        target = "target"
+
+    session.preprocessor = DataPreprocessor()
+    session.set_dataset(df, target)
+    session_store.update_config(
+        session,
+        {
+            "data_source": "ai",
+            "ai_description": body.description.strip(),
+            "target_column": target,
+        },
+    )
+    return {
+        "preview": session.preview(),
+        "code": result["code"],
+        "rows": result["rows"],
+    }
 
 
 @router.post("/session/{session_id}/data/csv")
@@ -82,7 +145,7 @@ async def upload_csv(session_id: str, file: UploadFile = File(...), target_colum
         raise HTTPException(400, f"CSV load failed: {e}")
     session.preprocessor = prep
     session.set_dataset(df, target)
-    session_store.update_config(session, {"target_column": target})
+    session_store.update_config(session, {"target_column": target, "data_source": "csv"})
     return {"preview": session.preview()}
 
 

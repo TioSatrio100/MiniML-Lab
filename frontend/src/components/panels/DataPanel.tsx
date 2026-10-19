@@ -1,13 +1,17 @@
 import { useEffect, useRef, useState } from 'react'
+import { Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Textarea } from '@/components/ui/textarea'
 import { api, type DataPreview, type SessionConfig } from '@/lib/api'
 import { useStore } from '@/lib/store'
 
 const TASKS = ['classification', 'regression', 'clustering', 'recommendation']
+
+const SYNTHETIC_UNSUPPORTED = ['clustering', 'recommendation']
 
 export default function DataPanel() {
   const sessionId = useStore((s) => s.sessionId)
@@ -19,15 +23,35 @@ export default function DataPanel() {
   const [error, setError] = useState<string | null>(null)
   const [nSamples, setNSamples] = useState(200)
   const [nFeatures, setNFeatures] = useState(10)
+  const [aiDescription, setAiDescription] = useState('')
+  const [aiBusy, setAiBusy] = useState(false)
+  const [aiCode, setAiCode] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
+
+  const syntheticBlocked = SYNTHETIC_UNSUPPORTED.includes(config?.task_type ?? 'classification')
 
   useEffect(() => {
     if (!sessionId) return
     api.preview(sessionId).then(setPreview).catch(() => setPreview(null))
   }, [sessionId])
 
+  const generateAI = async () => {
+    if (!sessionId || !aiDescription.trim() || aiBusy) return
+    setAiBusy(true)
+    setError(null)
+    try {
+      const r = await api.generateAIData(sessionId, aiDescription.trim(), nSamples)
+      setPreview(r.preview)
+      setAiCode(r.code)
+    } catch (e) {
+      setError(String((e as Error).message ?? e))
+    } finally {
+      setAiBusy(false)
+    }
+  }
+
   const generate = async () => {
-    if (!sessionId) return
+    if (!sessionId || syntheticBlocked) return
     setBusy(true)
     setError(null)
     try {
@@ -98,10 +122,15 @@ export default function DataPanel() {
                   ))}
                 </SelectContent>
               </Select>
-              <Button onClick={generate} disabled={busy}>
+              <Button onClick={generate} disabled={busy} title={syntheticBlocked ? 'Switch to classification/regression, or upload CSV / use AI data for this task' : undefined}>
                 Generate
               </Button>
             </div>
+            {syntheticBlocked && (
+              <p className="text-xs text-amber-600 dark:text-amber-400">
+                Synthetic data unavailable for {config?.task_type} — upload a CSV or use AI-generated data.
+              </p>
+            )}
           </CardContent>
         </Card>
 
@@ -123,6 +152,42 @@ export default function DataPanel() {
             <Button variant="outline" onClick={() => fileRef.current?.click()} disabled={busy}>
               Choose file…
             </Button>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-sm">
+              <Sparkles className="size-4 text-primary" />
+              AI-generated data
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-3">
+            <div>
+              <Label className="font-mono text-[10px] uppercase text-muted-foreground">Describe the dataset</Label>
+              <Textarea
+                value={aiDescription}
+                onChange={(e) => setAiDescription(e.target.value)}
+                placeholder={
+                  config?.task_type === 'clustering'
+                    ? 'e.g. mall customers with spending score and income forming ~5 groups'
+                    : config?.task_type === 'recommendation'
+                      ? 'e.g. 300 movies with genre, runtime, popularity and viewer ratings 1-5'
+                      : 'e.g. sensor readings predicting machine failure'
+                }
+                className="min-h-[64px] font-mono text-xs"
+               />
+            </div>
+            <Button onClick={() => void generateAI()} disabled={aiBusy || !aiDescription.trim()}>
+              {aiBusy ? 'Generating…' : 'Generate with AI'}
+            </Button>
+            {aiCode && (
+              <details className="font-mono text-[11px]">
+                <summary className="cursor-pointer text-muted-foreground">generated script</summary>
+                <pre className="mt-2 max-h-48 overflow-auto rounded-lg border border-border bg-muted p-3 text-[11px] text-foreground">
+                  {aiCode}
+                </pre>
+              </details>
+            )}
           </CardContent>
         </Card>
       </div>

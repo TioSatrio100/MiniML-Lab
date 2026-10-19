@@ -36,6 +36,8 @@ class MLAgentContext:
     budget_used: int = 0
     best_score: float = 0.0
     best_model_name: str = "None"
+    provider: str = "SumoPod"
+    model_name: str = "gpt-4o-mini"
     history: List[Dict[str, Any]] = field(default_factory=list)
 
 
@@ -164,6 +166,50 @@ def make_tools(ctx: MLAgentContext):
             return f"ERROR: {str(e)}"
 
     @tool
+    def generate_data(description: str, runtime: ToolRuntime) -> str:
+        """Generate a synthetic dataset from a natural-language description using the LLM
+        and sandbox execution. Use when no dataset exists or the task needs clustering/
+        recommendation data that the built-in generator cannot produce.
+        Returns confirmation with shape on success."""
+        if ctx.dataset is not None:
+            return "Dataset already exists. Skipping generate_data."
+        writer = runtime.stream_writer
+        writer(f"Generating data: {description[:60]}...")
+        try:
+            from backend.core.data_gen import generate_dataset
+
+            result = generate_dataset(
+                description=description,
+                task_type=ctx.task,
+                provider=ctx.provider,
+                model_name=ctx.model_name,
+            )
+        except ValueError as e:
+            return f"DATA_GEN_FAILED: {e}"
+        except Exception as e:
+            return f"DATA_GEN_FAILED: {e}"
+
+        df = result["df"]
+        target = None
+        if ctx.task == "recommendation" and "rating" in df.columns:
+            target = "rating"
+        elif ctx.task in ("classification", "regression") and "target" in df.columns:
+            target = "target"
+        ctx.preprocessor = type(ctx.preprocessor)()
+        ctx.dataset = df
+        ctx.target = target
+        try:
+            os.makedirs(os.path.dirname(ctx.data_path), exist_ok=True)
+            df.to_csv(ctx.data_path, index=False)
+        except Exception as e:
+            logger.warning(f"Failed persisting generated dataset: {e}")
+        writer(f"Generated dataset: {df.shape[0]} rows × {df.shape[1]} cols")
+        return (
+            f"Dataset generated: {df.shape[0]} rows × {df.shape[1]} cols, "
+            f"columns: {list(df.columns)}. Saved to DATA_PATH. Call analyze_dataset next."
+        )
+
+    @tool
     def get_history() -> str:
         """Get experiment history: best score so far and all iteration results with metrics/errors."""
         if not ctx.history:
@@ -220,7 +266,7 @@ def make_tools(ctx: MLAgentContext):
         """End the Auto-ML loop with a final summary of results."""
         return summary
 
-    return [analyze_dataset, run_experiment, get_history, save_model, finish]
+    return [analyze_dataset, generate_data, run_experiment, get_history, save_model, finish]
 
 
 def _parse_metrics(output: str) -> Optional[Dict[str, Any]]:
