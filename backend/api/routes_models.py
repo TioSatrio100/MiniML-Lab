@@ -7,6 +7,7 @@ from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse
+from pydantic import BaseModel
 
 from backend.core.model_manager import ModelManager
 from backend.core.visualization import get_task_metric
@@ -14,6 +15,10 @@ from backend.core.visualization import get_task_metric
 router = APIRouter(prefix="/api/models", tags=["models"])
 
 _manager: Optional[ModelManager] = None
+
+
+class RenameRequest(BaseModel):
+    new_name: str
 
 
 def get_manager() -> ModelManager:
@@ -57,6 +62,17 @@ def get_code(model_name: str) -> Dict[str, Any]:
                     return {"model_name": model_name, "code": f.read()}
             raise HTTPException(404, "No code artifact for this model")
     raise HTTPException(404, "Model not found")
+
+
+@router.patch("/{model_name}/rename")
+def rename_model(model_name: str, body: RenameRequest) -> Dict[str, Any]:
+    new_name = body.new_name.strip()
+    if not new_name:
+        raise HTTPException(400, "new_name required")
+    ok = get_manager().rename_model(model_name, new_name)
+    if not ok:
+        raise HTTPException(404, "Model not found")
+    return {"model_name": model_name, "new_name": new_name, "renamed": True}
 
 
 @router.get("/{model_name}/metadata")
