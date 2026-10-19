@@ -1,3 +1,5 @@
+import { useEffect, useState } from 'react'
+import { api } from '@/lib/api'
 import { useStore } from '@/lib/store'
 
 function Stat({ label, value }: { label: string; value: string }) {
@@ -13,11 +15,19 @@ export default function Hero() {
   const bestScore = useStore((s) => s.bestScore)
   const bestModelName = useStore((s) => s.bestModelName)
   const iterations = useStore((s) => s.iterations)
+  const sessionId = useStore((s) => s.sessionId)
+  const [progressImp, setProgressImp] = useState<number | null>(null)
 
-  const successful = iterations.filter((i) => i.status === 'success')
-  const first = successful[0]?.best_score ?? 0
-  const last = successful.length ? successful[successful.length - 1].best_score ?? 0 : 0
-  const improvement = successful.length ? last - first : 0
+  // server-computed improvement survives page-reload mid-history (no recompute drift)
+  useEffect(() => {
+    if (!sessionId) return
+    api
+      .progress(sessionId)
+      .then((r) => setProgressImp(r.stats.improvement))
+      .catch(() => setProgressImp(null))
+  }, [sessionId, iterations.length])
+
+  const improvement = progressImp ?? 0
 
   return (
     <header className="mb-6 flex flex-col gap-4 border-b border-border pb-6 md:flex-row md:items-end md:justify-between">

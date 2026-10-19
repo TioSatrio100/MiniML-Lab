@@ -35,7 +35,14 @@ export async function runAgent(): Promise<void> {
   }
   st.pushTrace(`⚡ provider=${init.provider} model=${init.model}`)
 
-  const { job_id } = await api.agentRun(sid)
+  let job_id: string
+  try {
+    ;({ job_id } = await api.agentRun(sid))
+  } catch (e) {
+    // 400 no dataset, 409 already running, etc. — surface, don't swallow
+    useStore.setState({ error: String((e as Error).message ?? e), running: false })
+    return
+  }
   currentJob = { sid, jobId: job_id }
   useStore.setState({ running: true })
   abort = new AbortController()

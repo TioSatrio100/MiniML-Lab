@@ -109,6 +109,12 @@ export const api = {
       body: JSON.stringify({ task_type, n_samples, n_features }),
     }),
 
+  generateAIData: (sid: string, description: string, n_samples?: number) =>
+    request<{ preview: DataPreview; code: string; rows: number }>(`/api/session/${sid}/data/ai`, {
+      method: 'POST',
+      body: JSON.stringify({ description, n_samples }),
+    }),
+
   uploadCsv: async (sid: string, file: File, target_column?: string | null) => {
     const form = new FormData()
     form.append('file', file)
@@ -138,6 +144,11 @@ export const api = {
   models: () => request<ModelInfo[]>('/api/models'),
   bestModel: (task: string) => request<ModelInfo>(`/api/models/best?task=${task}`),
   modelCode: (name: string) => request<{ model_name: string; code: string }>(`/api/models/${encodeURIComponent(name)}/code`),
+  renameModel: (name: string, new_name: string) =>
+    request<{ model_name: string; new_name: string; renamed: boolean }>(`/api/models/${encodeURIComponent(name)}/rename`, {
+      method: 'PATCH',
+      body: JSON.stringify({ new_name }),
+    }),
 
   progress: (sid: string) => request<ProgressResponse>(`/api/session/${sid}/progress`),
 

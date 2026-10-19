@@ -2,16 +2,12 @@
  * store.ts - zustand app state: session, config, agent trace, iterations.
  */
 import { create } from 'zustand'
-import { api, type DataPreview, type IterationResult, type Provider, type SessionConfig, type SessionStatus } from './api'
-
-type TabId = 'benchmark' | 'models' | 'sandbox'
+import { api, type IterationResult, type Provider, type SessionConfig, type SessionStatus } from './api'
 
 interface AppState {
   sessionId: string | null
   config: SessionConfig | null
   providers: Provider[]
-  preview: DataPreview | null
-  activeTab: TabId
 
   running: boolean
   trace: string[]
@@ -25,7 +21,6 @@ interface AppState {
   init: () => Promise<void>
   setConfig: (patch: Partial<SessionConfig>) => Promise<void>
   refreshProviders: () => Promise<void>
-  setTab: (t: TabId) => void
   applyStatus: (s: SessionStatus) => void
   pushTrace: (line: string) => void
   resetAgent: () => void
@@ -36,8 +31,6 @@ export const useStore = create<AppState>((set, get) => ({
   sessionId: null,
   config: null,
   providers: [],
-  preview: null,
-  activeTab: 'benchmark',
 
   running: false,
   trace: [],
@@ -53,6 +46,13 @@ export const useStore = create<AppState>((set, get) => ({
     const { session_id, config } = await api.createSession()
     const providers = await api.providers()
     set({ sessionId: session_id, config, providers })
+    // rehydrate mid-run state (page refresh during agent run)
+    try {
+      const status = await api.status(session_id)
+      get().applyStatus(status)
+    } catch {
+      /* status unavailable — fresh session is fine */
+    }
   },
 
   setConfig: async (patch) => {
@@ -63,8 +63,6 @@ export const useStore = create<AppState>((set, get) => ({
   },
 
   refreshProviders: async () => set({ providers: await api.providers() }),
-
-  setTab: (t) => set({ activeTab: t }),
 
   applyStatus: (s) =>
     set({

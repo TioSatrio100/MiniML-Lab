@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { ArrowLeft, Circle, Loader2, Moon, Sun } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { Badge } from '@/components/ui/badge'
@@ -54,14 +54,10 @@ export default function Sidebar() {
   const running = useStore((s) => s.running)
 
   const [apiKey, setApiKey] = useState('')
-  const [keySaved, setKeySaved] = useState(false)
 
   const provider = providers.find((p) => p.name === config?.provider) ?? null
-
-  useEffect(() => {
-    setKeySaved(provider?.has_key ?? false)
-    setApiKey('')
-  }, [provider?.name, provider?.has_key])
+  // derived during render — no effect churn when provider list updates
+  const keySaved = provider?.has_key ?? false
 
   if (!config) return null
 
@@ -69,7 +65,6 @@ export default function Sidebar() {
     if (!apiKey.trim() || !config.provider) return
     await api.updateProvider(config.provider, { api_key: apiKey.trim() })
     await refreshProviders()
-    setKeySaved(true)
     setApiKey('')
   }
 
@@ -128,7 +123,7 @@ export default function Sidebar() {
 
         <div className="flex flex-col gap-1.5">
           <Label className={labelCls}>
-            API key {keySaved && provider?.has_key ? <span className="text-green-700 dark:text-green-400">saved</span> : null}
+            API key {keySaved ? <span className="text-green-700 dark:text-green-400">saved</span> : null}
           </Label>
           <div className="flex gap-2">
             <Input
